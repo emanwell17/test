@@ -1,0 +1,12 @@
+{
+  "name": "scorezone-https-relay",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test relay.test.mjs",
+    "build": "node --check server.mjs && node --check relay.mjs"
+  }
+}
