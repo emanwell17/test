@@ -152,11 +152,13 @@ export function createRelay({ secret, apiKey, allowedOrigins = [], ttlSeconds = 
         for await (const chunk of req) { size += chunk.length; if (size > 16384) throw fail('Request too large', 413); chunks.push(chunk); }
         let data; try { data = JSON.parse(Buffer.concat(chunks)); } catch { throw fail('Invalid JSON'); }
         const url = mediaTarget(data.url, true);
-        const expires = now() + Math.max(60, Math.min(3600, Number(ttlSeconds) || 600)) * 1000;
-        const upstream = await get(url.href);
-        if (!upstream.playlist) throw fail('Source is not an HLS playlist', 502);
-        // Validate child destinations before handing out a usable session.
-        rewrite(upstream.body.toString('utf8'), url.href, expires);
+        const expires = Math.min(now() + Math.max(60, Math.min(3600, Number(ttlSeconds) || 600)) * 1000, Number(data.expiresAt) || Infinity);
+        if (expires <= now()) throw fail('Access has expired', 403);
+        if (data.validate !== false) {
+          const upstream = await get(url.href);
+          if (!upstream.playlist) throw fail('Source is not an HLS playlist', 502);
+          rewrite(upstream.body.toString('utf8'), url.href, expires);
+        }
         return send(res, 200, JSON.stringify({ path: link({ url: url.href, expires, playlist: true }), expiresAt: expires }), { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       }
       const match = route.pathname.match(/^\/hls\/([\w-]+)\/(?:index\.m3u8|media\.ts)$/);

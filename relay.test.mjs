@@ -13,6 +13,13 @@ async function call(handler, path, { method = 'GET', body, headers = {} } = {}) 
   await handler(req, res); return result;
 }
 const session = handler => call(handler, '/api/sessions', { method: 'POST', headers: { authorization: `Bearer ${apiKey}` }, body: { url: source } });
+test('site integration creates a session without scanning media and caps it at entitlement expiry', async () => {
+  const handler = createRelay({secret,apiKey,now:()=>1000,fetcher:()=>{throw new Error('Must not scan media');}});
+  const response = await call(handler,'/api/sessions',{method:'POST',headers:{authorization:`Bearer ${apiKey}`},body:{url:source,validate:false,expiresAt:91000}});
+  assert.equal(response.status,200); assert.equal(JSON.parse(response.body).expiresAt,91000);
+  const expired = await call(handler,'/api/sessions',{method:'POST',headers:{authorization:`Bearer ${apiKey}`},body:{url:source,validate:false,expiresAt:999}});
+  assert.equal(expired.status,403);
+});
 test('requires authentication, limits root sources and blocks private network targets', async () => {
   let calls = 0;
   const handler = createRelay({ secret, apiKey, fetcher: async () => { calls++; throw new Error('Must not fetch'); } });

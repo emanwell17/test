@@ -77,6 +77,12 @@ origin. Never send this API key to normal viewers or add a public URL-signing
 endpoint. The test page is for you as operator. This package does not change
 your website or its Premium rules by itself.
 
+The site backend can include `"validate":false` to create a session without
+fetching media during stream scanning. Validation of the source address still
+runs; media is fetched and checked when playback starts. Include `"expiresAt"`
+(Unix milliseconds) to cap the session at a Premium entitlement's expiry. The
+relay never extends its own configured maximum session lifetime.
+
 ## Local checks
 
 ```powershell
