@@ -168,6 +168,14 @@ export function createRelay({ secret, apiKey, allowedOrigins = [], ttlSeconds = 
       const upstream = await get(mediaTarget(session.url).href);
       const playlist = upstream.playlist;
       let body = playlist ? Buffer.from(rewrite(upstream.body.toString('utf8'), session.url, session.expires)) : upstream.body;
+      // Warm only segments from a playlist a viewer is actively requesting.
+      // Pending downloads are shared with playback; never delay the playlist.
+      if (playlist && req.method === 'GET' && upstream.body.includes(Buffer.from('#EXTINF:'))) {
+        const segments = upstream.body.toString('utf8').split(/\r?\n/).map(line=>line.trim()).filter(line=>line && !line.startsWith('#')).slice(-2);
+        for (const segment of segments) {
+          try { void get(mediaTarget(new URL(segment,session.url).href).href).catch(()=>{}); } catch {}
+        }
+      }
       const headers = { ...cors, 'Content-Type': playlist ? 'application/vnd.apple.mpegurl' : upstream.type, 'Cache-Control': playlist ? 'no-store' : `private, max-age=${Math.max(0, Math.min(300, Math.floor((session.expires - now()) / 1000)))}` };
       let status = 200;
       if (!playlist && req.headers.range) {

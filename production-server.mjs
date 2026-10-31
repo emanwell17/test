@@ -31,7 +31,7 @@ const publicServer=http.createServer(async(req,res)=>{
  if(req.method==='OPTIONS'){res.writeHead(204,cors);res.end();return;}
  const url=new URL(req.url,'http://backend.internal');
  try{
-  if(url.pathname==='/healthz'){send(res,200,{ok:true,version:'catalog-restream-v1',ffmpeg:true,configured:Boolean(process.env.IPTV_PLAYLIST_URL),features:['livescore','addon-fallback','daily-channels','shared-restream','4k-premium','hevc-filter']},cors);return;}
+  if(url.pathname==='/healthz'){send(res,200,{ok:true,version:'catalog-restream-v1',ffmpeg:true,configured:Boolean(process.env.IPTV_PLAYLIST_URL),features:['livescore','addon-fallback','daily-channels','shared-restream','shared-cached-relay','segment-prefetch','4k-premium','hevc-filter']},cors);return;}
   if(url.pathname.startsWith('/restream/')){
    if(!['GET','HEAD'].includes(req.method)){send(res,405,{error:'Method not allowed'},cors);return;}
    const upstream=http.request({hostname:'127.0.0.1',port:restreamPort,path:req.url,method:req.method,headers:{...(origin?{Origin:origin}:{}),...(req.headers.range?{Range:req.headers.range}:{})}},response=>{res.writeHead(response.statusCode,response.headers);response.pipe(res);});

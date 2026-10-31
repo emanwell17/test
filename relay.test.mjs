@@ -79,3 +79,22 @@ test('variants, alternate audio, init maps and suffix ranges use the signed rela
   assert.equal(range.status, 206); assert.equal(range.body.toString(), '678');
   assert.equal((await call(handler, media, { headers: { range: 'bytes=999-' } })).status, 416);
 });
+
+test('active playlists prefetch recent segments without blocking and viewers share each download', async () => {
+  const calls=[]; let release;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const handler=createRelay({secret,apiKey,fetcher:async url=>{
+    if(url===source)return {body:Buffer.from('#EXTM3U\n#EXTINF:10,\nold.ts\n#EXTINF:10,\nrecent.ts\n#EXTINF:10,\nnew.ts\n'),type:'application/vnd.apple.mpegurl'};
+    calls.push(url);await gate;return {body:Buffer.from('complete-segment'),type:'video/mp2t'};
+  }});
+  const created=await call(handler,'/api/sessions',{method:'POST',headers:{authorization:`Bearer ${apiKey}`},body:{url:source,validate:false}});
+  assert.equal(calls.length,0,'issuing a session must not start ingest');
+  const playlist=await call(handler,JSON.parse(created.body).path);
+  assert.equal(playlist.status,200,'playlist returns while segments are still downloading');
+  assert.equal(calls.length,2);assert.ok(calls.every(url=>!url.endsWith('old.ts')));
+  const path=playlist.body.toString().split('\n').filter(line=>line.startsWith('/hls/')).at(-1);
+  const viewers=Promise.all([call(handler,path),call(handler,path)]);
+  release();const replies=await viewers;
+  assert.equal(calls.length,2,'both viewers use the existing prefetch');
+  assert.ok(replies.every(reply=>reply.status===200&&reply.body.toString()==='complete-segment'));
+});
