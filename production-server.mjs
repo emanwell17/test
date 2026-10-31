@@ -5,7 +5,10 @@ import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 process.env.SCOREZONE_MANAGED_BACKEND='true';
 process.env.SCOREZONE_PUBLIC_ORIGIN=process.env.SCOREZONE_PUBLIC_ORIGIN||'https://testscore.pxxl.pro';
-process.env.SCOREZONE_DATA_DIR=process.env.SCOREZONE_DATA_DIR||fileURLToPath(new URL('./data/',import.meta.url));
+const {prepareDataDirectory}=await import('./scripts/data-directory.mjs');
+const storage=await prepareDataDirectory({preferred:process.env.SCOREZONE_DATA_DIR});
+process.env.SCOREZONE_DATA_DIR=storage.path;
+if(storage.fallback)console.warn('Configured data directory unavailable; using writable temporary storage. Daily scans rebuild after restart.');
 if(!process.env.FFMPEG_PATH){
  try{process.env.FFMPEG_PATH=(await import('ffmpeg-static')).default;}catch{process.env.FFMPEG_PATH='ffmpeg';}
 }

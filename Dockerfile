@@ -9,5 +9,6 @@ USER node
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV FFMPEG_PATH=/usr/bin/ffmpeg
+ENV SCOREZONE_DATA_DIR=/app/data
 EXPOSE 3000
 CMD ["node", "production-server.mjs"]

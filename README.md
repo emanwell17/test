@@ -12,6 +12,6 @@ Keep the existing RELAY_SECRET and SESSION_API_KEY. Add IPTV_PLAYLIST_URL as a p
 
 Internal ports 8791 and 8792 bind to loopback. Only PORT is exposed publicly. Public media is HTTPS through /restream; /hls remains compatible with existing signed relay links. No public endpoint accepts arbitrary provider URLs without the server API key.
 
-Generated media and the daily catalog are under ./data by default. Set SCOREZONE_DATA_DIR to a persistent writable volume if Pxxl provides one. Without a persistent volume, a restart rebuilds the daily scan. Idle video ingests stop after 60 seconds; inactive output files are cleaned. This initial configuration permits eight simultaneous active channels, each shared by all of its viewers.
+Generated media and the daily catalog are under the operating system temporary directory by default. Set SCOREZONE_DATA_DIR to a persistent writable volume if Pxxl provides one. An unavailable configured directory falls back to temporary storage so startup can continue. Without a persistent volume, a restart rebuilds the daily scan. Idle video ingests stop after 60 seconds; inactive output files are cleaned. This initial configuration permits eight simultaneous active channels, each shared by all of its viewers.
 
 The server copies codecs without transcoding. Source/provider account limits still apply. Premium tickets are capped at verified entitlement expiry. Secrets and provider source URLs stay on the backend.
