@@ -47,7 +47,7 @@ export async function startRestreamServer(){
   if(!resolve(dir).startsWith(resolve(root)+ '\\')&&!resolve(dir).startsWith(resolve(root)+'/'))throw Error('Invalid output path');
   for(const file of await readdir(dir))if(/^(?:index\.m3u8|seg_\d+_\d+\.ts)(?:\.tmp)?$/.test(file))await unlink(join(dir,file)).catch(()=>{});
   const generation=Date.now();
-  const args=['-hide_banner','-loglevel','error','-nostdin','-protocol_whitelist','http,https,tcp,tls,crypto','-rw_timeout','65000000','-fflags','+genpts','-analyzeduration','1000000','-probesize','1000000','-i',`${restreamInternalOrigin}/input/${id}/index.m3u8`,'-map','0:v:0','-map','0:a:0?','-c','copy','-f','hls','-hls_time','4','-hls_list_size','6','-hls_delete_threshold','2','-hls_flags','delete_segments+omit_endlist+temp_file','-hls_segment_filename',join(dir,`seg_${generation}_%06d.ts`),join(dir,'index.m3u8')];
+  const args=['-hide_banner','-loglevel','error','-nostdin','-protocol_whitelist','http,https,tcp,tls,crypto','-rw_timeout','65000000','-fflags','+genpts','-analyzeduration','1000000','-probesize','1000000','-i',`${restreamInternalOrigin}/input/${id}/index.m3u8`,'-map','0:v:0','-map','0:a:0?','-c','copy','-f','hls','-hls_time','4','-hls_start_number_source','epoch','-hls_list_size','6','-hls_delete_threshold','2','-hls_flags','delete_segments+omit_endlist+temp_file+discont_start','-hls_segment_filename',join(dir,`seg_${generation}_%06d.ts`),join(dir,'index.m3u8')];
   const child=spawn(process.env.FFMPEG_PATH||'ffmpeg',args,{windowsHide:true,stdio:['ignore','ignore','pipe']});
   // Do not expose FFmpeg diagnostics: they can contain signed upstream URLs.
   let lastError='';child.stderr.on('data',chunk=>{lastError=(lastError+chunk).slice(-2048);void writeFile(join(dir,'status.log'),lastError.replace(/https?:\/\/\S+/g,'[url]').replace(/\/hls\/[\w-]+/g,'/hls/[redacted]')).catch(()=>{});});
@@ -97,7 +97,7 @@ export async function startRestreamServer(){
     try{bytes=await readFile(join(feed.dir,media[2]));if(bytes.length)break;}catch{}
     if(feed.stopped)throw Error('Input stopped');await new Promise(resolve=>setTimeout(resolve,500));
    }
-   if(!bytes) return send(res,503,'Feed preparing',cors);
+   if(!bytes?.length) return send(res,503,'Feed preparing',cors);
    manager.touch(access.id);
    const headers={...cors,'Content-Type':media[2]==='index.m3u8'?'application/vnd.apple.mpegurl':'video/mp2t'};
    if(media[2].endsWith('.ts')){
