@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDaddySchedule, matchDaddyEvent, sameChannel } from './daddy-matching.js';
+import { parseDaddySchedule, matchDaddyEvent, sameChannel, matchesIptvEvent } from './daddy-matching.js';
 const html = `<div class="schedule__dayTitle">Friday 30th Oct 2026 - Schedule Time UK GMTT</div><div class="schedule__catHeader"><div class="card__meta">All Soccer Events ⚽</div></div><div class="schedule__event"><span data-time="18:00"></span><span class="schedule__eventTitle">France - Ligue 1 : Le Havre 🇫🇷 vs PSG 🇫🇷</span><a href="/watch.php?id=425">beIN SPORTS USA</a><a href="/watch.php?id=2">Event SD Stream</a></div>`;
 test('matches both teams, PSG alias, sport and date without retaining generic event streams', () => {
   const events = parseDaddySchedule(html), fixture = { home:'Le Havre', away:'Paris Saint-Germain', sport:'football', start:Date.UTC(2026,9,30,18) };
@@ -36,4 +36,13 @@ test('name matching tolerates an overnight delay and selects the closest occurre
   const fixture={home:'Phoenix Suns',away:'Denver Nuggets',sport:'basketball',start};
   assert.deepEqual(matchDaddyEvent([next,event],fixture).channels,[{name:'Altitude USA'}]);
   assert.equal(matchDaddyEvent([next],fixture),null);
+});
+
+test('West Ham broadcast aliases and event metadata resolve without matching another opponent', () => {
+  assert.equal(sameChannel('CBS Sports Golazo', 'PRIME: CBS SPORTS GOLAZO NETWORK'), true);
+  assert.equal(sameChannel('CBS Sports Golazo', 'RK: CBS SPORTS GOLAZO NETWORK'), true);
+  const fixture={home:'West Ham United',away:'West Bromwich Albion',sport:'football',start:Date.UTC(2026,9,31,15)};
+  assert.equal(matchesIptvEvent('English Football League: West Ham United vs West Bromwich Albion @ Oct 31 10:30 AM :Paramount+ 06',fixture),true);
+  assert.equal(matchesIptvEvent('West Ham vs West Brom @ Oct 31 3:50 PM :Viaplay DK 28',fixture),true);
+  assert.equal(matchesIptvEvent('West Ham vs Liverpool @ Oct 31 3:50 PM :Viaplay DK 28',fixture),false);
 });

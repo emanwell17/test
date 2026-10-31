@@ -1,6 +1,6 @@
 const text = value => String(value || '').replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ').trim();
 const key = value => text(value).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9+]+/g, ' ').trim().replace(/\s+/g, ' ');
-const aliases = { psg: 'paris saint germain', 'man utd': 'manchester united', 'man united': 'manchester united', 'man city': 'manchester city', 'inter milan': 'internazionale', 'inter': 'internazionale', 'casa pia ac': 'casa pia', 'sporting cp': 'sporting', 'vfl bochum': 'bochum', 'tsv hartberg': 'hartberg', 'grenoble foot 38': 'grenoble', 'boulogne sur mer': 'boulogne', 'clermont foot 63': 'clermont', 'cracovia krakow': 'cracovia', 'ca huracan': 'huracan', 'gimnasia lp': 'gimnasia la plata', 'fc rapid 1923': 'rapid bucuresti', 'rapid 1923': 'rapid bucuresti', 'miercurea ciuc': 'csikszereda', 'los angeles lakers': 'la lakers', 'los angeles clippers': 'la clippers' };
+const aliases = { 'west ham': 'west ham united', 'west brom': 'west bromwich albion', 'west bromwich': 'west bromwich albion', psg: 'paris saint germain', 'man utd': 'manchester united', 'man united': 'manchester united', 'man city': 'manchester city', 'inter milan': 'internazionale', 'inter': 'internazionale', 'casa pia ac': 'casa pia', 'sporting cp': 'sporting', 'vfl bochum': 'bochum', 'tsv hartberg': 'hartberg', 'grenoble foot 38': 'grenoble', 'boulogne sur mer': 'boulogne', 'clermont foot 63': 'clermont', 'cracovia krakow': 'cracovia', 'ca huracan': 'huracan', 'gimnasia lp': 'gimnasia la plata', 'fc rapid 1923': 'rapid bucuresti', 'rapid 1923': 'rapid bucuresti', 'miercurea ciuc': 'csikszereda', 'los angeles lakers': 'la lakers', 'los angeles clippers': 'la clippers' };
 const team = value => { const name = key(value).replace(/\bfc\b/g, '').trim(); return aliases[name] || name; };
 export function matchesSingleEvent(name, fixture) {
   const clean=value=>key(value).replace(/\bformula one\b|\bf1\b/g,'formula 1').replace(/\bmexican\b/g,'mexico').replace(/\bmoto gp\b/g,'motogp').replace(/\bqualification\b/g,'qualifying');
@@ -34,7 +34,7 @@ export function matchesIptvEvent(name, fixture) {
   }
   const label = String(name).split('|').find(part=>/\s+(?:vs?\.?|versus)\s+/i.test(part));
   if(!label)return false;
-  const sides=label.split(/\s+(?:vs?\.?|versus)\s+/i).map(side=>side.replace(/^\s*[A-Z]{2,4}\s*-\s*/, '').trim());
+  const sides=label.split(/\s+(?:vs?\.?|versus)\s+/i).map(side=>side.split('@')[0].replace(/^.*?:\s*/, '').replace(/^\s*[A-Z]{2,4}\s*-\s*/, '').replace(/\s*(?:@|\(|Strong8K|[ᴸᶦᵛᵉ]).*$/i, '').trim());
   if(sides.length!==2)return false;
   const equal=(a,b)=>{
     const x=team(a),y=team(b);
@@ -120,6 +120,8 @@ export function channelIdentity(value) {
   const tokens = name.split(' '), locations = [...new Set(tokens.filter(t => regions[t]).map(t => regions[t]))];
   name = tokens.filter(t => !regions[t]).join(' ');
   if(locations.length)name=name.replace(/^en /,'');
+  name=name.replace(/^(?:prime|rk) /,'');
+  if(name==='cbs sport golazo network'||name==='cbs sport galazo network')name='cbs sport golazo';
   if(name==='altitude')name='altitude sport';
   if(name==='rogers sportsnet one')name='sportsnet one';
   if(name==='sportsnet one'&&!locations.length)locations.push('ca');
