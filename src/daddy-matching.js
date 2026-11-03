@@ -1,7 +1,8 @@
 const text = value => String(value || '').replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ').trim();
-const key = value => text(value).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9+]+/g, ' ').trim().replace(/\s+/g, ' ');
+const key = value => text(value).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/ø/g, "o").replace(/[^a-z0-9+]+/g, ' ').trim().replace(/\s+/g, ' ');
 const aliases = { 'west ham': 'west ham united', 'west brom': 'west bromwich albion', 'west bromwich': 'west bromwich albion', psg: 'paris saint germain', 'man utd': 'manchester united', 'man united': 'manchester united', 'man city': 'manchester city', 'inter milan': 'internazionale', 'inter': 'internazionale', 'casa pia ac': 'casa pia', 'sporting cp': 'sporting', 'vfl bochum': 'bochum', 'tsv hartberg': 'hartberg', 'grenoble foot 38': 'grenoble', 'boulogne sur mer': 'boulogne', 'clermont foot 63': 'clermont', 'cracovia krakow': 'cracovia', 'ca huracan': 'huracan', 'gimnasia lp': 'gimnasia la plata', 'fc rapid 1923': 'rapid bucuresti', 'rapid 1923': 'rapid bucuresti', 'miercurea ciuc': 'csikszereda', 'los angeles lakers': 'la lakers', 'los angeles clippers': 'la clippers' };
-const team = value => { const name = key(value).replace(/\bfc\b/g, '').trim(); return aliases[name] || name; };
+const broadcastAliases = {'as roma':'roma','vfb stuttgart':'stuttgart','bayern munchen':'bayern munich','bodoe glimt':'bodo glimt','lask linz':'lask','qpr':'queens park rangers'};
+const team = value => { const name = key(value).replace(/\bfc\b/g, '').trim(); return broadcastAliases[name] || aliases[name] || name; };
 export function matchesSingleEvent(name, fixture) {
   const clean=value=>key(value).replace(/\bformula one\b|\bf1\b/g,'formula 1').replace(/\bmexican\b/g,'mexico').replace(/\bmoto gp\b/g,'motogp').replace(/\bqualification\b/g,'qualifying');
   const wanted=clean(fixture.home),actual=clean(name),context=clean(fixture.competition||'');
@@ -89,7 +90,7 @@ export function parseDaddySchedule(html) {
       const name = text(chunk.match(/class="schedule__eventTitle">([\s\S]*?)<\/span>/)?.[1]);
       const time = chunk.match(/data-time="(\d{2}:\d{2})"/)?.[1];
       const channels = [...chunk.matchAll(/<a\b[^>]*href="\/watch\.php\?id=(\d+)"[^>]*>([^<]+)<\/a>/g)].map(m => ({ id: m[1], name: text(m[2]) }));
-      if (name && channels.length) events.push({ name, sport: categorySport(category), category, timestamp: ukTimestamp(day, time || ''), channels });
+      if (name && channels.length) events.push({ name, sport: name.startsWith('⚽') ? 'football' : categorySport(category), category, timestamp: ukTimestamp(day, time || ''), channels });
     }
   }
   return events;

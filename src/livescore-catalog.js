@@ -24,6 +24,7 @@ export const LEAGUES = {
 };
 const key = value => String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 export function selectedLeague(sport, stage) {
+  if (isYouthEvent({name:[stage.Snm,stage.CompN,stage.Cnm].filter(Boolean).join(' ')})) return false;
   const rules = LEAGUES[sport];
   // These sports had no individual competition selections on the config page.
   if (!rules) return ['billiards', 'afl', 'darts', 'other'].includes(sport);
@@ -49,8 +50,15 @@ export function normalizeLiveScore(feed, sport) {
 
 // Keep overnight fixtures from the preceding catalog day through 05:00 Lagos.
 export function includeCatalogEvent(event, now=Date.now()) {
+  if(isYouthEvent(event))return false;
   const midnight=Math.floor((now+3600000)/86400000)*86400000-3600000;
   if(event.timestamp>=midnight)return true;
   if(event.status==='live')return true;
   return now-midnight<5*3600000 && event.timestamp>=midnight-86400000 && !['ft','aet','ap','finished','ended','canceled','cancelled'].includes(String(event.status).toLowerCase());
 }
+
+export function isYouthEvent(event) {
+  const text = [event.home_team_name, event.away_team_name, event.home, event.away, event.name, event._league, event._competition, event.competition, ...(event.genres || [])].filter(Boolean).join(" ").normalize("NFKC");
+  return /\b(?:u|under)[\s-]*\d{1,2}\b|\byouth\b/i.test(text);
+}
+export const isUnder18Event = isYouthEvent;

@@ -2,6 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseDaddySchedule, matchDaddyEvent, sameChannel, matchesIptvEvent } from './daddy-matching.js';
 const html = `<div class="schedule__dayTitle">Friday 30th Oct 2026 - Schedule Time UK GMTT</div><div class="schedule__catHeader"><div class="card__meta">All Soccer Events ⚽</div></div><div class="schedule__event"><span data-time="18:00"></span><span class="schedule__eventTitle">France - Ligue 1 : Le Havre 🇫🇷 vs PSG 🇫🇷</span><a href="/watch.php?id=425">beIN SPORTS USA</a><a href="/watch.php?id=2">Event SD Stream</a></div>`;
+
+test('broadcast team aliases match European fixtures while preserving both teams and date',()=>{
+ const start=Date.UTC(2026,10,3,20);
+ for(const [home,away,actualHome,actualAway] of [['Manchester United','AS Roma','Manchester United','Roma'],['Galatasaray','VfB Stuttgart','Galatasaray','Stuttgart'],['Atletico Madrid','Bayern Munich','Atlético Madrid','Bayern München'],['Bodoe/Glimt','Lille','Bodø / Glimt','Lille']]){
+  const fixture={home,away,sport:'football',start};
+  const event={name:`UEFA Champions League : ${actualHome} vs ${actualAway}`,sport:'football',timestamp:start,channels:[{name:'TNT Sports 1 UK'}]};
+  assert.ok(matchDaddyEvent([event],fixture),`${home} vs ${away}`);
+  assert.equal(matchDaddyEvent([event],{...fixture,away:'Other opponent'}),null);
+  assert.equal(matchDaddyEvent([event],{...fixture,start:start+86400000}),null);
+ }
+});
+
+test('football event markers identify league-specific schedule categories',()=>{
+ const schedule=html.replace('All Soccer Events ⚽','England - Championship').replace('France - Ligue 1 :','⚽ England - Championship :');
+ assert.equal(parseDaddySchedule(schedule)[0].sport,'football');
+});
 test('matches both teams, PSG alias, sport and date without retaining generic event streams', () => {
   const events = parseDaddySchedule(html), fixture = { home:'Le Havre', away:'Paris Saint-Germain', sport:'football', start:Date.UTC(2026,9,30,18) };
   assert.equal(matchDaddyEvent(events, fixture).channels.length, 1);

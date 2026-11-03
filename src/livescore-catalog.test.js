@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { selectedLeague, normalizeLiveScore, includeCatalogEvent } from './livescore-catalog.js';
+import { selectedLeague, normalizeLiveScore, includeCatalogEvent, isYouthEvent } from './livescore-catalog.js';
+
+test('all youth age groups and youth competitions are excluded without hiding senior United teams', () => {
+ for(const name of ['Manchester United U19','U-21 League','Under 23','Under-17','UEFA Youth League','U15','U 20']){
+  assert.equal(isYouthEvent({name}),true,name);
+  assert.equal(includeCatalogEvent({name,timestamp:Date.now()+3600000}),false,name);
+ }
+ for(const name of ['Manchester United','UFC 319','UEFA Champions League'])assert.equal(isYouthEvent({name}),false,name);
+ assert.equal(selectedLeague('football',{Snm:'Champions League U19'}),false);
+ assert.equal(selectedLeague('football',{Snm:'Champions League'}),true);
+});
 test('selected football leagues are country scoped and tolerate LiveScore aliases', () => {
   assert.equal(selectedLeague('football', { Cnm: 'England', Snm: 'Premier League' }), true);
   assert.equal(selectedLeague('football', { Cnm: 'Egypt', Snm: 'Premier League' }), false);
