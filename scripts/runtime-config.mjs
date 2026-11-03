@@ -30,3 +30,11 @@ export const relayPort=port('SCOREZONE_RELAY_PORT',8791);
 export const restreamPort=port('SCOREZONE_RESTREAM_PORT',8792);
 export const relayInternalOrigin=`http://127.0.0.1:${relayPort}`;
 export const restreamInternalOrigin=`http://127.0.0.1:${restreamPort}`;
+export function playbackRelay(){
+ const origin=process.env.PLAYBACK_RELAY_ORIGIN;
+ if(!origin)return null;
+ if(origin!=='https://scorezone-cache-relay-test.scorezone.workers.dev')throw Error('Invalid playback relay origin');
+ const apiKey=process.env.PLAYBACK_RELAY_API_KEY;
+ if(!apiKey)throw Error('PLAYBACK_RELAY_API_KEY is not configured');
+ return {origin,apiKey};
+}

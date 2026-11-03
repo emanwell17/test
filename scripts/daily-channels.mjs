@@ -1,4 +1,4 @@
-import {managed,dataRoot,publicOrigin,sessionApiKey,configuredPlaylistUrl,relayInternalOrigin,restreamInternalOrigin} from './runtime-config.mjs';
+import {managed,dataRoot,publicOrigin,sessionApiKey,configuredPlaylistUrl,relayInternalOrigin,restreamInternalOrigin,playbackRelay} from './runtime-config.mjs';
 import {pathToFileURL} from 'node:url';
 import {join,sep} from 'node:path';
 import {streamTier,excludedCodec} from '../shared/stream-tier.js';
@@ -106,8 +106,9 @@ async function resolveSource(stableUrl){
 }
 const relaySources=new Map();
 async function issueRelaySession(url,expiresAt){
- const key=await sessionApiKey();
- const r=await fetch(`${relayInternalOrigin}/api/sessions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({url,validate:false,...(expiresAt?{expiresAt}:{})}),signal:AbortSignal.timeout(15000),redirect:'error'});
+ const remote=playbackRelay();
+ const key=remote?.apiKey||await sessionApiKey();
+ const r=await fetch(`${remote?.origin||relayInternalOrigin}/api/sessions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({url,validate:false,...(expiresAt?{expiresAt}:{})}),signal:AbortSignal.timeout(15000),redirect:'error'});
  if(!r.ok)throw Error('Relay unavailable');const ticket=await r.json();
  if(!/^\/hls\/[\w-]+\/index\.m3u8$/.test(ticket.path||'')||!(ticket.expiresAt>Date.now()))throw Error('Invalid relay session');
  return ticket;
@@ -116,7 +117,7 @@ async function createSession(url,reference){
  if(managed){
   const ticket=await issueRelaySession(url);
   relaySources.set(reference.id,url);
-  return {url:`${publicOrigin}${ticket.path}`,expiresAt:ticket.expiresAt};
+  return {url:`${playbackRelay()?.origin||publicOrigin}${ticket.path}`,expiresAt:ticket.expiresAt};
  }
 
  await ensureLocalRelay();
@@ -149,7 +150,7 @@ export async function playDailyChannel(matchKey,channelId,access=null){
  if(streamTier(reference).locked && managed){
   const source=relaySources.get(reference.id);if(!source)throw Error('Select channel again');
   const ticket=await issueRelaySession(source,access.expiresAt);
-  session={url:`${publicOrigin}${ticket.path}`,expiresAt:ticket.expiresAt};
+  session={url:`${playbackRelay()?.origin||publicOrigin}${ticket.path}`,expiresAt:ticket.expiresAt};
  }else if(streamTier(reference).locked){
   const key=await sessionApiKey();
   const r=await fetch(`${restreamInternalOrigin}/api/sessions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({channelId:reference.id,expiresAt:access.expiresAt}),signal:AbortSignal.timeout(10000)});
