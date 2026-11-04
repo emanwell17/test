@@ -105,12 +105,26 @@ export function matchDaddyEvent(events, fixture) {
     const sides = label.split(/\s+(?:vs?\.?|versus|@|x)\s+/i).map(team);
     return sides.length === 2 && ((sides[0] === home && sides[1] === away) || (sides[0] === away && sides[1] === home));
   });
+  const unknownStart=fixture.unknownStart===true||fixture.unknownStart==='true';
+  const fullWindow=(unknownStart?24:6)*60*60000;
+  if(away&&!unknownStart&&!found.some(e=>e.timestamp&&Math.abs(e.timestamp-start)<=fullWindow)){
+    const partial=events.filter(event=>event.sport===fixture.sport&&event.timestamp&&Math.abs(event.timestamp-start)<=30*60000).map(event=>{
+      const label=text(event.name).split(/\s*:\s*/).at(-1);
+      const sides=label.split(/\s+(?:vs?\.?|versus|@|x)\s+/i).map(team);
+      return {event,sides};
+    }).filter(({event,sides})=>sides.length===2&&sides.every(Boolean)&&! /\b(?:u|under)[\s-]*\d{1,2}\b|\byouth\b/i.test(event.name)&&sides.some(side=>side===home||side===away));
+    // Multiple broadcasts of one fixture are safe; competing opponents are not.
+    const identities=new Set(partial.map(({sides})=>[...sides].sort().join('|')));
+    if(identities.size!==1)return null;
+    const candidates=partial.map(p=>p.event).sort((a,b)=>Math.abs(a.timestamp-start)-Math.abs(b.timestamp-start));
+    const closest=candidates[0];
+    return {...closest,channels:[...new Map(candidates.flatMap(e=>e.channels).filter(c=>!/^event\b|not listed/i.test(c.name)).map(c=>[key(c.name),c])).values()]};
+  }
   if (!found.length) return null;
   // Names establish identity first. Use time afterwards to choose the nearest
   // occurrence, allowing an overnight delay without mixing different days.
   found.sort((a,b)=>Math.abs(a.timestamp-start)-Math.abs(b.timestamp-start));
   const closest=found[0];
-  const unknownStart=fixture.unknownStart===true||fixture.unknownStart==='true';
   if(!closest.timestamp || Math.abs(closest.timestamp-start)>(unknownStart?24:6)*60*60000)return null;
   const sameOccurrence=found.filter(event=>Math.abs(event.timestamp-closest.timestamp)<=(away?30:90)*60000);
   return { ...closest, channels: [...new Map(sameOccurrence.flatMap(e => e.channels).filter(c => !/^event\b|not listed/i.test(c.name)).map(c => [key(c.name), c])).values()] };

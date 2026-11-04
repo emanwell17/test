@@ -9,7 +9,7 @@ test('broadcast team aliases match European fixtures while preserving both teams
   const fixture={home,away,sport:'football',start};
   const event={name:`UEFA Champions League : ${actualHome} vs ${actualAway}`,sport:'football',timestamp:start,channels:[{name:'TNT Sports 1 UK'}]};
   assert.ok(matchDaddyEvent([event],fixture),`${home} vs ${away}`);
-  assert.equal(matchDaddyEvent([event],{...fixture,away:'Other opponent'}),null);
+  assert.equal(matchDaddyEvent([event],{...fixture,home:'Other home',away:'Other opponent'}),null);
   assert.equal(matchDaddyEvent([event],{...fixture,start:start+86400000}),null);
  }
 });
@@ -21,7 +21,7 @@ test('football event markers identify league-specific schedule categories',()=>{
 test('matches both teams, PSG alias, sport and date without retaining generic event streams', () => {
   const events = parseDaddySchedule(html), fixture = { home:'Le Havre', away:'Paris Saint-Germain', sport:'football', start:Date.UTC(2026,9,30,18) };
   assert.equal(matchDaddyEvent(events, fixture).channels.length, 1);
-  assert.equal(matchDaddyEvent(events, {...fixture, away:'Rennes'}), null);
+  assert.equal(matchDaddyEvent(events, {...fixture, home:'Nantes',away:'Rennes'}), null);
   assert.equal(matchDaddyEvent(events, {...fixture, start:fixture.start+86400000}), null);
   assert.equal(matchDaddyEvent(events, {...fixture, sport:'basketball'}), null);
 });
@@ -33,11 +33,29 @@ test('channel comparison preserves country and channel number while ignoring qua
   assert.equal(sameChannel('Sky Sport Austria 1', 'AT: SKY SPORT AUSTRIA 1 4K'), true);
   assert.equal(sameChannel('Arena Sport 8 Serbia', 'SR: ARENA SPORT 8 RAW'), true);
 });
-test('team aliases still require the other team, sport and kickoff to match', () => {
+test('team aliases reject fixtures with neither team matching', () => {
   const events = [{ name:'Austria - Bundesliga : Grazer AK vs Hartberg', sport:'football', timestamp:1793385000000, channels:[{name:'Sky Sport Austria 1'}] }];
   const fixture = {home:'Grazer AK',away:'TSV Hartberg',sport:'football',start:1793385000000};
   assert.ok(matchDaddyEvent(events, fixture));
-  assert.equal(matchDaddyEvent(events, {...fixture,home:'Austria Wien'}), null);
+  assert.equal(matchDaddyEvent(events, {...fixture,home:'Austria Wien',away:'Salzburg'}), null);
+});
+
+test('one-team fallback accepts home or away within 30 minutes, prioritizes full matches and rejects ambiguity',()=>{
+ const start=Date.UTC(2026,10,4,20),fixture={home:'Manchester United',away:'Roma alternate label',sport:'football',start};
+ const event={name:'UEFA Champions League : Manchester United vs Roma',sport:'football',timestamp:start+30*60000,channels:[{name:'TNT Sports 1 UK'}]};
+ assert.ok(matchDaddyEvent([event],fixture));
+ assert.ok(matchDaddyEvent([event],{...fixture,home:'Roma alternate label',away:'Manchester United'}));
+ assert.equal(matchDaddyEvent([{...event,timestamp:event.timestamp+1}],fixture),null);
+ assert.equal(matchDaddyEvent([{...event,sport:'basketball'}],fixture),null);
+ assert.equal(matchDaddyEvent([event],{...fixture,unknownStart:'true'}),null);
+ const conflict={...event,name:'Manchester United vs Liverpool',channels:[{name:'Wrong broadcast'}]};
+ assert.equal(matchDaddyEvent([event,conflict],fixture),null);
+ const exact={...event,name:'Manchester United vs Roma alternate label',timestamp:start,channels:[{name:'Correct broadcast'}]};
+ assert.deepEqual(matchDaddyEvent([event,conflict,exact],fixture).channels,exact.channels);
+ const duplicate={...event,name:'Roma vs Manchester United',channels:[{name:'TNT Sports 2 UK'}]};
+ assert.equal(matchDaddyEvent([event,duplicate],fixture).channels.length,2);
+ assert.equal(matchDaddyEvent([{...event,name:'Manchester United vs Roma U19'}],fixture),null);
+ assert.equal(matchDaddyEvent([{...event,name:'Manchester United Women vs Roma'}],fixture),null);
 });
 test('overnight NBA events belong to the next calendar day, including month boundaries', () => {
   const night = html.replace('Friday 30th Oct 2026','Saturday 31st Oct 2026').replace('All Soccer Events ⚽','NBA').replace('18:00','02:00').replace('France - Ligue 1 : Le Havre 🇫🇷 vs PSG 🇫🇷','NBA : Phoenix Suns vs Denver Nuggets');
