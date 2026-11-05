@@ -12,8 +12,22 @@ const root=pathToFileURL(join(dataRoot,'daily-channels')+sep);
 const sports={football:'soccer',basketball:'basketball','american-football':'american-football',hockey:'hockey',baseball:'baseball','motor-sports':'motorsport',fight:'boxing',tennis:'tennis',rugby:'rugby-union',golf:'golf',billiards:'billiards',afl:'afl',darts:'darts',cricket:'cricket',other:'other'};
 const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Lagos',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 let loaded, database, preparing, timer, resources, resourcePending;
+const cacheVersion = 13;
 async function get(url,type='json') { const r=await fetch(url,{signal:AbortSignal.timeout(25000)});if(!r.ok){const error=Error(`Upstream HTTP ${r.status}`);error.status=r.status;throw error;}return type==='text'?r.text():r.json(); }
-async function load(){if(!loaded)loaded=(async()=>{try{database=JSON.parse(await readFile(new URL('current.json',root),'utf8'));if(database.version!==12)database.completedSports=[];}catch{database={version:12,day:'',matches:{},completedSports:[]};}return database;})();return loaded;}
+async function load(){
+ if(!loaded)loaded=(async()=>{
+  try{
+   database=JSON.parse(await readFile(new URL('current.json',root),'utf8'));
+   if(database.version!==cacheVersion){
+    database.completedSports=[];
+    database.matches=Object.fromEntries(Object.entries(database.matches).filter(([,record])=>!record.fixture?.eventId||record.fixture.away));
+    database.version=cacheVersion;
+   }
+  }catch{database={version:cacheVersion,day:'',matches:{},completedSports:[]};}
+  return database;
+ })();
+ return loaded;
+}
 let saving=Promise.resolve();
 function save(){saving=saving.catch(()=>{}).then(async()=>{await mkdir(root,{recursive:true});await writeFile(new URL(`current-${process.pid}.tmp`,root),JSON.stringify(database));await rename(new URL(`current-${process.pid}.tmp`,root),new URL('current.json',root));});return saving;}
 async function inputs(){
@@ -46,7 +60,7 @@ export async function prepareDailyChannels(){
  if(preparing)return preparing;
  preparing=(async()=>{
   await load(); const today=day();
-  const source=await inputs();database.version=12;
+  const source=await inputs();database.version=cacheVersion;
   if(database.day===today&&database.completedSports.length===Object.keys(sports).length){
    // Re-match stored fixtures against schedule updates; channel URLs and the
    // daily IPTV index remain reusable without resolving any playback links.
@@ -55,7 +69,7 @@ export async function prepareDailyChannels(){
   }
   if(database.day!==today){
    const carry=Object.fromEntries(Object.entries(database.matches).filter(([,m])=>includeCatalogEvent({timestamp:Number(m.fixture.start),status:''})));
-   database={version:12,day:today,matches:carry,completedSports:[]};
+   database={version:cacheVersion,day:today,matches:carry,completedSports:[]};
   }
   for(const [key,record]of Object.entries(database.matches))database.matches[key]=prepareFixture(record.fixture,source.events,source.index);
   await save();
@@ -85,13 +99,15 @@ export async function prepareDailyChannels(){
 }
 export async function listDailyChannels(fixture){
  await load();const key=fixtureKey(fixture);const saved=database.matches[key];
- if(saved)return {key,channels:prioritizeChannels(saved.channels.filter(c=>!excludedCodec(c))).map(streamTier).map(({url,...c})=>c),match:saved.match,complete:true};
+ const savedChannels=saved?.channels.filter(c=>!excludedCodec(c));
+ if(savedChannels?.length)return {key,channels:prioritizeChannels(savedChannels).map(streamTier).map(({url,...c})=>c),match:saved.match,complete:true};
  void prepareDailyChannels().catch(()=>{});
  if(!resources)void inputs().catch(()=>{});
  // An uncached page can be prepared from the same single daily playlist index.
  if(resources?.day===day()){
   const prepared=prepareFixture(fixture,resources.events,resources.index);
-  database.matches[key]=prepared;await save();return {key,channels:prioritizeChannels(prepared.channels).map(streamTier).map(({url,...c})=>c),match:prepared.match,complete:true};
+  if(prepared.channels.length){database.matches[key]=prepared;await save();}
+  return {key,channels:prioritizeChannels(prepared.channels).map(streamTier).map(({url,...c})=>c),match:prepared.match,complete:true};
  }
  return {key,channels:[],match:null,complete:false};
 }

@@ -5,7 +5,7 @@ export function excludedCodec(channel){
 export function streamTier(channel){
   const label=String(channel.name||'');
   const quality=superscriptQuality({name:label});
-  return {...channel,locked:isFourK(channel),quality};
+  return {...channel,locked:channel.addonChannelListing !== true && isFourK(channel),quality};
 }
 export function isFourK(channel){
   return ['4K','3840P','2160P'].includes(superscriptQuality({name:channel.name})) || /\b(?:4k|3840p|2160p)\b/i.test(String(channel.name).normalize('NFKC'));

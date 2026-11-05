@@ -25,11 +25,31 @@ export function parsePlaylist(text, playlistUrl) {
 }
 export function playlistIndex(entries) {
   const index = new Map();
-  for (const entry of entries.filter(entry=>!excludedCodec(entry))) { const k=identity(entry.name); if(!index.has(k)) index.set(k,[]); index.get(k).push(entry); }
+  index.byName = new Map();
+  for (const entry of entries.filter(entry=>!excludedCodec(entry))) {
+    const channel = channelIdentity(entry.name);
+    const k = JSON.stringify(channel);
+    if (!index.has(k)) index.set(k, []);
+    index.get(k).push(entry);
+    if (!index.byName.has(channel.name)) index.byName.set(channel.name, []);
+    index.byName.get(channel.name).push({ entry, region: channel.region });
+  }
   index.eventChannels=entries.filter(entry=>!excludedCodec(entry)).filter(entry=>/\s+(?:vs?\.?|versus)\s+|^(?:live|next)\s*\|/i.test(entry.name));
   return index;
 }
 export function prepareFixture(fixture, events, index) {
+  if (fixture.eventId && !fixture.away) {
+    const {name, region} = channelIdentity(fixture.home);
+    const wantsFourK = isFourK({name: fixture.home});
+    const candidates = (name ? index.byName?.get(name) || [] : []).filter(item =>
+      (!region || item.region === region) && (!wantsFourK || isFourK(item.entry)));
+    const exactRegion = candidates.filter(item => item.region === region);
+    const selected = exactRegion.length ? exactRegion : new Set(candidates.map(item => item.region)).size === 1 ? candidates : [];
+    if (selected.length) {
+      const channels = [...new Map(selected.map(({entry}) => [entry.id, entry])).values()];
+      return { fixture, match: null, channels: prioritizeChannels(channels).slice(0, 8).map(entry => streamTier({...entry, addonChannelListing: true})) };
+    }
+  }
   const match = matchDaddyEvent(events, fixture);
   const byChannel = (match?.channels || []).map(c => (index.get(identity(c.name)) || []).map(entry => ({...entry,daddyChannel:c.name})));
   // Round robin keeps different channels represented before adding variants.

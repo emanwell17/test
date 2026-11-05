@@ -3,6 +3,17 @@ import assert from 'node:assert/strict';
 import {matchesIptvEvent} from '../src/daddy-matching.js';
 import {prepareFixture,playlistIndex} from './daily-channel-core.mjs';
 const fixture={home:'Golden State Warriors',away:'LA Lakers',sport:'basketball',start:Date.UTC(2026,9,31,2)};
+test('addon channel listings open the requested IPTV channel to free viewers',()=>{
+ const channel={home:'4K : SKY SPORTS F1',away:'',sport:'motor-sports',eventId:'leaf:4k-sky-sports-f1'};
+ const uhd={id:'uhd',name:'4K: SKY SPORTS F1 ᵁᴴᴰ ³⁸⁴⁰ᴾ'};
+ const hd={id:'hd',name:'UK: SKY SPORTS F1 ᴴᴰ'};
+ const other={id:'other',name:'IT: SKY SPORT F1 4K'};
+ const index=playlistIndex([hd,other,uhd]);
+ assert.deepEqual(prepareFixture(channel,[],index).channels.map(({id,locked})=>({id,locked})),[{id:'uhd',locked:false}]);
+ assert.equal(prepareFixture(channel,[],playlistIndex([hd])).channels.length,0);
+ assert.equal(prepareFixture({...channel,eventId:''},[],index).channels.length,0);
+ assert.equal(prepareFixture({...channel,home:'UK: SKY SPORTS F1'},[],index).channels[0].id,'hd');
+});
 test('event fallback accepts both NBA teams in reversed and abbreviated labels but excludes other opponents and old dates',()=>{
  assert.equal(matchesIptvEvent('Live | Lakers vs. Warriors | all | US: PPV 123',fixture),true);
  assert.equal(matchesIptvEvent('LIVE | GSW - WARRIORS VS LAL - LAKERS | BR: NBA PPV',fixture),true);
