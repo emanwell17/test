@@ -131,11 +131,11 @@ export function matchDaddyEvent(events, fixture) {
 }
 const regions = { austria:'at', at:'at', sr:'rs', slovakia:'sk', sk:'sk', denmark:'dk', dk:'dk', romania:'ro', ro:'ro', netherlands:'nl', nl:'nl', brazil:'br', br:'br', australia:'au', au:'au', switzerland:'ch', ch:'ch', belgium:'be', be:'be', greece:'gr', gr:'gr', uk:'uk', gb:'uk', usa:'us', us:'us', france:'fr', fr:'fr', portugal:'pt', pt:'pt', poland:'pl', pl:'pl', croatia:'hr', hr:'hr', serbia:'rs', rs:'rs', argentina:'ar', ar:'ar', bulgaria:'bg', bg:'bg', turkey:'tr', tr:'tr', spain:'es', es:'es', italy:'it', it:'it', germany:'de', de:'de', canada:'ca', ca:'ca', israel:'il', il:'il', cz:'cz', mena:'mena' };
 export function channelIdentity(value) {
-  let name = key(String(value).normalize('NFKC')).replace(/\b(?:fhd|uhd|hd|sd|4k|8k|raw|hevc|h265|1080p|720p|2160p|3840p|50fps|60fps)\b/g, '').replace(/([a-z])(\d)/g, '$1 $2').replace(/\b(?:sports?)\s*(\d+)/g, 'sport $1').replace(/\bsports\b/g, 'sport').replace(/\s+/g, ' ').trim();
+  let name = key(String(value).normalize('NFKC')).replace(/\b(?:fhd|uhd|hd|sd|4k|8k|raw|hevc|h265|1080p|720p|2160p|3840p|50fps|60fps)\b\+?/g, '').replace(/([a-z])(\d)/g, '$1 $2').replace(/\b(?:sports?)\s*(\d+)/g, 'sport $1').replace(/\bsports\b/g, 'sport').replace(/\s+/g, ' ').trim();
   const tokens = name.split(' '), locations = [...new Set(tokens.filter(t => regions[t]).map(t => regions[t]))];
   name = tokens.filter(t => !regions[t]).join(' ');
   if(locations.length)name=name.replace(/^en /,'');
-  name=name.replace(/^(?:prime|rk) /,'');
+  name=name.replace(/^(?:prime|rk|vip) /,'');
   if(name==='cbs sport golazo network'||name==='cbs sport galazo network')name='cbs sport golazo';
   if(name==='altitude')name='altitude sport';
   if(name==='rogers sportsnet one')name='sportsnet one';
