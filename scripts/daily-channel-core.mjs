@@ -34,7 +34,7 @@ export function playlistIndex(entries) {
     if (!index.byName.has(channel.name)) index.byName.set(channel.name, []);
     index.byName.get(channel.name).push({ entry, region: channel.region });
   }
-  index.eventChannels=entries.filter(entry=>!excludedCodec(entry)).filter(entry=>/\s+(?:vs?\.?|versus)\s+|^(?:live|next)\s*\|/i.test(entry.name));
+  index.eventChannels=entries.filter(entry=>!excludedCodec(entry)).filter(entry=>/\s+(?:vs?\.?|versus)\s+|^(?:live|next)\s*\||^(?:UFC\s+\d|WWE\s+(?:Monday Night Raw|Friday Night SmackDown|NXT)|AEW\s+(?:Dynamite|Collision)|Oktagon\s+\d)/i.test(entry.name));
   return index;
 }
 export function prepareFixture(fixture, events, index) {
@@ -50,7 +50,7 @@ export function prepareFixture(fixture, events, index) {
       return { fixture, match: null, channels: prioritizeChannels(channels).slice(0, 8).map(entry => streamTier({...entry, addonChannelListing: true})) };
     }
   }
-  const match = matchDaddyEvent(events, fixture);
+  const match = fixture.sport === 'fight' ? null : matchDaddyEvent(events, fixture);
   const byChannel = (match?.channels || []).map(c => (index.get(identity(c.name)) || []).map(entry => ({...entry,daddyChannel:c.name})));
   // Round robin keeps different channels represented before adding variants.
   const refs=[]; const seen=new Set();

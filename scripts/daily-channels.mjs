@@ -1,6 +1,7 @@
 import {managed,dataRoot,publicOrigin,sessionApiKey,configuredPlaylistUrl,relayInternalOrigin,restreamInternalOrigin,playbackRelay} from './runtime-config.mjs';
 import {pathToFileURL} from 'node:url';
 import {join,sep} from 'node:path';
+import {createHash} from 'node:crypto';
 import {streamTier,excludedCodec} from '../shared/stream-tier.js';
 import {addonFixture} from '../src/addon-fixture.js';
 import {ensureLocalRelay,ensureLocalRestream} from './local-relay-process.mjs';
@@ -12,7 +13,9 @@ const root=pathToFileURL(join(dataRoot,'daily-channels')+sep);
 const sports={football:'soccer',basketball:'basketball','american-football':'american-football',hockey:'hockey',baseball:'baseball','motor-sports':'motorsport',fight:'boxing',tennis:'tennis',rugby:'rugby-union',golf:'golf',billiards:'billiards',afl:'afl',darts:'darts',cricket:'cricket',other:'other'};
 const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Lagos',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 let loaded, database, preparing, timer, resources, resourcePending;
-const cacheVersion = 13;
+const cacheVersion = 15;
+let dailyPlaylist, playlistPending;
+let playlistDiskPending, playlistRetryAt=0;
 async function get(url,type='json') { const r=await fetch(url,{signal:AbortSignal.timeout(25000)});if(!r.ok){const error=Error(`Upstream HTTP ${r.status}`);error.status=r.status;throw error;}return type==='text'?r.text():r.json(); }
 async function load(){
  if(!loaded)loaded=(async()=>{
@@ -20,7 +23,7 @@ async function load(){
    database=JSON.parse(await readFile(new URL('current.json',root),'utf8'));
    if(database.version!==cacheVersion){
     database.completedSports=[];
-    database.matches=Object.fromEntries(Object.entries(database.matches).filter(([,record])=>!record.fixture?.eventId||record.fixture.away));
+    database.matches=Object.fromEntries(Object.entries(database.matches).filter(([,record])=>record.fixture?.sport!=='fight'&&(!record.fixture?.eventId||record.fixture.away)));
     database.version=cacheVersion;
    }
   }catch{database={version:cacheVersion,day:'',matches:{},completedSports:[]};}
@@ -30,16 +33,52 @@ async function load(){
 }
 let saving=Promise.resolve();
 function save(){saving=saving.catch(()=>{}).then(async()=>{await mkdir(root,{recursive:true});await writeFile(new URL(`current-${process.pid}.tmp`,root),JSON.stringify(database));await rename(new URL(`current-${process.pid}.tmp`,root),new URL('current.json',root));});return saving;}
+async function loadPlaylist(){
+ const today=day();
+ const url=await configuredPlaylistUrl();
+ const fingerprint=createHash('sha256').update(url).digest('hex');
+ if(!playlistDiskPending)playlistDiskPending=(async()=>{
+  try{
+   const stored=JSON.parse(await readFile(new URL('playlist-index.json',root),'utf8'));
+   if(stored.fingerprint===fingerprint&&Array.isArray(stored.entries)&&Date.now()-stored.savedAt<7*86400000){
+    const text=stored.entries.map(entry=>`#EXTINF:-1,${entry.name}\n${entry.url}`).join('\n');
+    const entries=parsePlaylist(text,url);
+    if(entries.length)dailyPlaylist={day:stored.day,index:playlistIndex(entries)};
+   }
+  }catch{}
+ })();
+ await playlistDiskPending;
+ if(dailyPlaylist?.day===today)return dailyPlaylist.index;
+ if(Date.now()<playlistRetryAt){
+  if(dailyPlaylist)return dailyPlaylist.index;
+  throw Error('Playlist refresh unavailable');
+ }
+ if(!playlistPending)playlistPending=(async()=>{
+  const entries=parsePlaylist(await get(url,'text'),url);
+  if(!entries.length)throw Error('IPTV playlist empty');
+  dailyPlaylist={day:today,index:playlistIndex(entries)};
+  try{
+   await mkdir(root,{recursive:true});
+   const temporary=new URL(`playlist-index-${process.pid}.tmp`,root);
+   await writeFile(temporary,JSON.stringify({day:today,fingerprint,savedAt:Date.now(),entries}));
+   await rename(temporary,new URL('playlist-index.json',root));
+  }catch{}
+  return dailyPlaylist.index;
+ })().catch(error=>{playlistRetryAt=Date.now()+30000;throw error;}).finally(()=>playlistPending=null);
+ if(dailyPlaylist){
+  void playlistPending.catch(()=>{});
+  return dailyPlaylist.index;
+ }
+ return playlistPending;
+}
 async function inputs(){
  if(resources?.day===day() && resources.scheduleExpires>Date.now())return resources;
  if(resourcePending)return resourcePending;
  resourcePending=(async()=>{
- const sameDay=resources?.day===day();
- const playlistUrl=await configuredPlaylistUrl();
- const [html,playlist]=await Promise.all([get('https://thedaddy.pk/','text'),sameDay?Promise.resolve(null):get(playlistUrl,'text')]);
- const entries=playlist===null?null:parsePlaylist(playlist,playlistUrl);if(entries&&!entries.length)throw Error('IPTV playlist empty');
- const events=parseDaddySchedule(html);if(!events.length)throw Error('Schedule empty');
- resources={day:day(),events,index:sameDay?resources.index:playlistIndex(entries),scheduleExpires:Date.now()+300000};return resources;
+ const [html,index]=await Promise.all([get('https://thedaddy.pk/','text').catch(()=>null),loadPlaylist()]);
+ const parsed=html===null?[]:parseDaddySchedule(html);
+ const events=parsed.length?parsed:resources?.events||[];
+ resources={day:day(),events,index,scheduleAvailable:parsed.length>0,scheduleExpires:Date.now()+300000};return resources;
  })().finally(()=>resourcePending=null);return resourcePending;
 }
 async function prepareAddonSport(sport, source){
@@ -51,10 +90,16 @@ async function prepareAddonSport(sport, source){
   for(const meta of data.metas){
    if(seen.has(meta.id))continue;seen.add(meta.id);
    const fixture=addonFixture(meta,sport);
-   if(Number.isFinite(fixture.start))database.matches[fixtureKey(fixture)]=prepareFixture(fixture,source.events,source.index);
+   if(Number.isFinite(fixture.start))storeFixture(fixture,source);
   }
   if(data.metas.length<20)break;
  }
+}
+function storeFixture(fixture,source){
+ const key=fixtureKey(fixture);
+ const prepared=prepareFixture(fixture,source.events,source.index);
+ if(!prepared.channels.length&&!source.scheduleAvailable&&database.matches[key]?.channels.length)return;
+ database.matches[key]={...prepared,preparedDay:day()};
 }
 export async function prepareDailyChannels(){
  if(preparing)return preparing;
@@ -64,18 +109,18 @@ export async function prepareDailyChannels(){
   if(database.day===today&&database.completedSports.length===Object.keys(sports).length){
    // Re-match stored fixtures against schedule updates; channel URLs and the
    // daily IPTV index remain reusable without resolving any playback links.
-   for(const [key,record]of Object.entries(database.matches))database.matches[key]=prepareFixture(record.fixture,source.events,source.index);
+   for(const record of Object.values(database.matches))storeFixture(record.fixture,source);
    await save();return;
   }
   if(database.day!==today){
    const carry=Object.fromEntries(Object.entries(database.matches).filter(([,m])=>includeCatalogEvent({timestamp:Number(m.fixture.start),status:''})));
    database={version:cacheVersion,day:today,matches:carry,completedSports:[]};
   }
-  for(const [key,record]of Object.entries(database.matches))database.matches[key]=prepareFixture(record.fixture,source.events,source.index);
+  for(const record of Object.values(database.matches))storeFixture(record.fixture,source);
   await save();
-  // Process one sport at a time; no per-channel network calls or video downloads.
-  for(const [sport,slug]of Object.entries(sports)){
-   if(database.completedSports.includes(sport))continue;
+  // Bound catalog concurrency so one slow sport cannot block every later sport.
+  const remaining=Object.entries(sports).filter(([sport])=>!database.completedSports.includes(sport));
+  async function prepareSport([sport,slug]){
    try{
     const feed=await get(`https://prod-cdn-public-api.livescore.com/v1/api/app/date/${slug}/${today.replaceAll('-','')}/0.0?locale=en&MD=1`);
     if(!Array.isArray(feed.Stages))throw Error('Invalid catalog');
@@ -83,7 +128,7 @@ export async function prepareDailyChannels(){
     const previousFeed=await get(`https://prod-cdn-public-api.livescore.com/v1/api/app/date/${slug}/${previous.toISOString().slice(0,10).replaceAll('-','')}/0.0?locale=en&MD=1`).catch(()=>({Stages:[]}));
     for(const event of [...normalizeLiveScore(previousFeed,sport),...normalizeLiveScore(feed,sport)].filter(e=>includeCatalogEvent(e))){
      const fixture={home:event.home_team_name,away:event.away_team_name,sport,start:event.timestamp};
-     database.matches[fixtureKey(fixture)]=prepareFixture(fixture,source.events,source.index);
+     storeFixture(fixture,source);
     }
     database.completedSports.push(sport);await save();
    }catch(error){
@@ -94,21 +139,18 @@ export async function prepareDailyChannels(){
     // are recorded for today instead of being requested every five minutes.
    }
   }
+  for(let offset=0;offset<remaining.length;offset+=3){
+   await Promise.all(remaining.slice(offset,offset+3).map(prepareSport));
+  }
  })().finally(()=>{preparing=null;});
  return preparing;
 }
 export async function listDailyChannels(fixture){
  await load();const key=fixtureKey(fixture);const saved=database.matches[key];
  const savedChannels=saved?.channels.filter(c=>!excludedCodec(c));
- if(savedChannels?.length)return {key,channels:prioritizeChannels(savedChannels).map(streamTier).map(({url,...c})=>c),match:saved.match,complete:true};
+ if(savedChannels?.length||saved?.preparedDay===day())return {key,channels:prioritizeChannels(savedChannels||[]).map(streamTier).map(({url,...c})=>c),match:saved.match,complete:true};
+ if(!saved)database.matches[key]={fixture,match:null,channels:[]};
  void prepareDailyChannels().catch(()=>{});
- if(!resources)void inputs().catch(()=>{});
- // An uncached page can be prepared from the same single daily playlist index.
- if(resources?.day===day()){
-  const prepared=prepareFixture(fixture,resources.events,resources.index);
-  if(prepared.channels.length){database.matches[key]=prepared;await save();}
-  return {key,channels:prioritizeChannels(prepared.channels).map(streamTier).map(({url,...c})=>c),match:prepared.match,complete:true};
- }
  return {key,channels:[],match:null,complete:false};
 }
 async function resolveSource(stableUrl){

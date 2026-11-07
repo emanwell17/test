@@ -31,7 +31,10 @@ export function matchesIptvEvent(name, fixture) {
     if(scheduled&&Math.abs(Date.UTC(+scheduled[3],+scheduled[2]-1,+scheduled[1],+scheduled[4],+scheduled[5])-Number(fixture.start))>6*3600000)return false;
     const date=String(name).match(/\b(\d{4})-(\d{2})-(\d{2})/);
     if(date&&Math.abs(Date.UTC(+date[1],+date[2]-1,+date[3])-Number(fixture.start))>36*3600000)return false;
-    return matchesSingleEvent(name,fixture);
+    const eventTitle = fixture.sport === 'fight'
+      ? String(name).replace(/^(?:live|next)\s*\|\s*/i, '').split('|')[0].replace(/\s+@.*$/, '')
+      : name;
+    return matchesSingleEvent(eventTitle,fixture);
   }
   const label = String(name).split('|').find(part=>/\s+(?:vs?\.?|versus)\s+/i.test(part));
   if(!label)return false;
