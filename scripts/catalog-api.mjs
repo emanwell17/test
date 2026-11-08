@@ -3,8 +3,23 @@ const sports=new Set(['soccer','basketball','american-football','hockey','baseba
 const catalogs=new Set(['football','basketball','american_football','hockey','baseball','motor_sports','fight','tennis','rugby','golf','billiards','afl','darts','cricket','other'].map(s=>'sports_'+s));
 async function cached(key,load){
  const hit=cache.get(key);if(hit&&hit.expires>Date.now())return hit.data;
- if(pending.has(key))return pending.get(key);
- const job=(async()=>{const data=await load();cache.set(key,{data,expires:Date.now()+300000});while(cache.size>256)cache.delete(cache.keys().next().value);return data;})().finally(()=>pending.delete(key));pending.set(key,job);return job;
+ if(!pending.has(key)&&(!hit?.retryAt||hit.retryAt<=Date.now()||hit.staleUntil<=Date.now())){
+  const job=(async()=>{
+   const data=await load();
+   cache.set(key,{data,expires:Date.now()+300000,staleUntil:Date.now()+900000});
+   while(cache.size>256)cache.delete(cache.keys().next().value);
+   return data;
+  })().catch(error=>{
+   if(hit)hit.retryAt=Date.now()+30000;
+   throw error;
+  }).finally(()=>pending.delete(key));
+  pending.set(key,job);
+ }
+ if(hit&&hit.staleUntil>Date.now()){
+  void pending.get(key)?.catch(()=>{});
+  return {...hit.data,stale:true};
+ }
+ return pending.get(key);
 }
 export async function catalogApi(path,search,fetcher=fetch){
  const live=path.match(/^\/api\/livescore\/([a-z-]+)\/(\d{8})$/);

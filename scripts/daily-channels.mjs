@@ -149,6 +149,16 @@ export async function listDailyChannels(fixture){
  await load();const key=fixtureKey(fixture);const saved=database.matches[key];
  const savedChannels=saved?.channels.filter(c=>!excludedCodec(c));
  if(savedChannels?.length||saved?.preparedDay===day())return {key,channels:prioritizeChannels(savedChannels||[]).map(streamTier).map(({url,...c})=>c),match:saved.match,complete:true};
+ // An unprepared fixture can still use the index already built by the daily scan.
+ const index=dailyPlaylist?.index||resources?.index;
+ if(index){
+  const prepared=prepareFixture(fixture,resources?.events||[],index);
+  if(prepared.channels.length){
+   database.matches[key]={...prepared,preparedDay:day()};
+   void save().catch(()=>{});
+   return {key,channels:prepared.channels.map(({url,...channel})=>channel),match:prepared.match,complete:true};
+  }
+ }
  if(!saved)database.matches[key]={fixture,match:null,channels:[]};
  void prepareDailyChannels().catch(()=>{});
  return {key,channels:[],match:null,complete:false};
