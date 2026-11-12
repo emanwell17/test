@@ -3,6 +3,7 @@
 export const LEAGUES = {
   football: [
     ['', 'Friendlies|International Friendlies|Club Friendlies|Friendly Matches|International Friendly|Club Friendly'],
+    ['', 'UEFA Nations League|Nations League'],
     ['England', 'Premier League'], ['Spain', 'LaLiga|La Liga'], ['France', 'Ligue 1'], ['Italy', 'Serie A'],
     ['England', 'Championship|EFL Championship'], ['Scotland', 'Premiership'], ['Spain', 'LaLiga 2|Segunda Division'],
     ['Brazil', 'Serie A'], ['Romania', 'Liga 1|Liga I|Superliga'], ['Greece', 'Super League'], ['Denmark', 'Superliga'],
