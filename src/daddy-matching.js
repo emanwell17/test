@@ -138,7 +138,12 @@ export function channelIdentity(value) {
   const tokens = name.split(' '), locations = [...new Set(tokens.filter(t => regions[t]).map(t => regions[t]))];
   name = tokens.filter(t => !regions[t]).join(' ');
   if(locations.length)name=name.replace(/^en /,'');
-  name=name.replace(/^(?:prime|rk|vip) /,'');
+  name=name.replace(/^(?:prime|rk|vip|tv) /,'');
+  const movistar = name.match(/^(?:m\+ laliga tv|movistar laliga)(?: (\d+))?$/);
+  if (movistar && (!locations.length || locations.every(location => location === 'es'))) {
+    name = `movistar laliga${movistar[1] ? ` ${movistar[1]}` : ''}`;
+    if (!locations.length) locations.push('es');
+  }
   if(name==='cbs sport golazo network'||name==='cbs sport galazo network')name='cbs sport golazo';
   if(name==='altitude')name='altitude sport';
   if(name==='rogers sportsnet one')name='sportsnet one';

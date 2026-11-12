@@ -13,7 +13,7 @@ const root=pathToFileURL(join(dataRoot,'daily-channels')+sep);
 const sports={football:'soccer',basketball:'basketball','american-football':'american-football',hockey:'hockey',baseball:'baseball','motor-sports':'motorsport',fight:'boxing',tennis:'tennis',rugby:'rugby-union',golf:'golf',billiards:'billiards',afl:'afl',darts:'darts',cricket:'cricket',other:'other'};
 const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Lagos',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 let loaded, database, preparing, timer, resources, resourcePending;
-const cacheVersion = 15;
+const cacheVersion = 16;
 let dailyPlaylist, playlistPending;
 let playlistDiskPending, playlistRetryAt=0;
 async function get(url,type='json') { const r=await fetch(url,{signal:AbortSignal.timeout(25000)});if(!r.ok){const error=Error(`Upstream HTTP ${r.status}`);error.status=r.status;throw error;}return type==='text'?r.text():r.json(); }
