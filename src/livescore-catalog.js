@@ -32,6 +32,7 @@ export function selectedLeague(sport, stage) {
   if (!rules) return ['billiards', 'afl', 'darts', 'other'].includes(sport);
   const names = [stage.Snm, stage.CompN].map(key);
   const country = key(stage.Cnm);
+  if (sport === 'football' && country === 'spain' && names.some(name => /^segunda division rfef\b/.test(name))) return false;
   return rules.some(([countries, aliases]) => (!countries || countries.split('|').some(c => key(c) === country)) &&
     aliases.split('|').some(alias => names.some(name => name === key(alias) || name.startsWith(`${key(alias)} `))));
 }
