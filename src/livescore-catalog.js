@@ -12,7 +12,7 @@ export const LEAGUES = {
     ['Austria', 'Bundesliga|Cup|OFB Cup'], ['Scotland', 'FA Cup|Scottish Cup'], ['England', 'League One'], ['France', 'Ligue 2'],
     ['Germany', '2 Bundesliga|Bundesliga 2'], ['', 'Copa Sudamericana|Copa Libertadores'], ['Australia', 'A League|A League Men'],
     ['Poland', 'Ekstraklasa'], ['Germany', 'Bundesliga|DFB Pokal'], ['', 'Champions League|Europa League|Conference League'],
-    ['Saudi Arabia', 'Pro League|Saudi Pro League'], ['Turkiye|Turkey', 'Super Lig'], ['Belgium', 'Pro League|First Division A'],
+    ['Saudi Arabia', 'Pro League|Saudi Pro League|Saudi Professional League'], ['Turkiye|Turkey', 'Super Lig'], ['Belgium', 'Pro League|First Division A'],
     ['Switzerland', 'Super League'], ['USA|United States', 'MLS'], ['Spain', 'Copa del Rey'], ['England', 'EFL Cup|EFL Trophy'],
     ['Portugal', 'Taca da Liga|League Cup'], ['Denmark', 'DBU Pokalen|Cup'], ['Greece', 'Cup|Greek Cup'], ['Netherlands', 'KNVB Cup|Cup'],
   ],
