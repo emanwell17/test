@@ -1,3 +1,4 @@
+import {addonCatalogUrl} from './addon-catalog-source.mjs';
 const cache=new Map(),pending=new Map();
 const sports=new Set(['soccer','basketball','american-football','hockey','baseball','motorsport','boxing','tennis','rugby-union','golf','billiards','afl','darts','cricket']);
 const catalogs=new Set(['football','basketball','american_football','hockey','baseball','motor_sports','fight','tennis','rugby','golf','billiards','afl','darts','cricket','other'].map(s=>'sports_'+s));
@@ -35,7 +36,7 @@ export async function catalogApi(path,search,fetcher=fetch){
  if(addon){
   const skip=Number(search.get('skip')||0);if(!catalogs.has(addon[1])||!Number.isInteger(skip)||skip<0||skip>2000)return {status:400,data:{error:'Invalid catalog'}};
   return {status:200,data:await cached(path+'?skip='+skip,async()=>{
-   const r=await fetcher(`https://scorezonetv.live/api/catalog/${addon[1]}?skip=${skip}`,{signal:AbortSignal.timeout(20000)});
+   const r=await fetcher(await addonCatalogUrl(addon[1],skip),{signal:AbortSignal.timeout(20000)});
    if(!r.ok)throw Error('Addon unavailable');const d=await r.json();if(!Array.isArray(d.metas))throw Error('Invalid addon catalog');return {metas:d.metas};
   })};
  }

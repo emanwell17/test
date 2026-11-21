@@ -4,6 +4,7 @@ import {join,sep} from 'node:path';
 import {createHash} from 'node:crypto';
 import {streamTier,excludedCodec} from '../shared/stream-tier.js';
 import {addonFixture} from '../src/addon-fixture.js';
+import {catalogApi} from './catalog-api.mjs';
 import {ensureLocalRelay,ensureLocalRestream} from './local-relay-process.mjs';
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {parseDaddySchedule} from '../src/daddy-matching.js';
@@ -85,7 +86,7 @@ async function prepareAddonSport(sport, source){
  const catalog=`sports_${sport.replaceAll('-','_')}`;
  const seen=new Set();
  for(let skip=0;skip<2000;skip+=20){
-  const data=await get(`https://scorezonetv.live/api/catalog/${catalog}?skip=${skip}`);
+  const {data}=await catalogApi(`/api/addon-catalog/${catalog}`,new URLSearchParams({skip:String(skip)}));
   if(!Array.isArray(data.metas))throw Error('Invalid addon catalog');
   for(const meta of data.metas){
    if(seen.has(meta.id))continue;seen.add(meta.id);
