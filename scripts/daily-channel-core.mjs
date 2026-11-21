@@ -67,7 +67,7 @@ export function prepareFixture(fixture, events, index) {
   for(let i=0;byChannel.some(group=>group[i]);i++) for(const group of byChannel) {
     const entry=group[i]; if(entry&&!seen.has(entry.id)){seen.add(entry.id);refs.push(entry);}
   }
-  if(!refs.length) {
+  {
     for(const entry of index.eventChannels || [])if(matchesIptvEvent(entry.name,fixture)&&!seen.has(entry.id)){
       seen.add(entry.id);refs.push({...entry,...(match?{daddyChannel:match.name}:{}),eventFallback:true});
     }
