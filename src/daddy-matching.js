@@ -43,6 +43,10 @@ export function matchesIptvEvent(name, fixture) {
   const equal=(a,b)=>{
     const x=team(a),y=team(b);
     if(x===y)return true;
+    if(fixture.sport==='fight'){
+      const surname=y.split(' ').at(-1);
+      return Boolean(surname?.length>=4 && x.split(' ').includes(surname));
+    }
     if(fixture.sport!=='basketball')return false;
     const nba=['warriors','lakers','clippers','suns','nuggets','mavericks','rockets','heat','pacers','timberwolves','jazz','trail blazers','hornets','76ers','pelicans','hawks','celtics','bulls','nets','knicks','bucks','cavaliers','pistons','magic','raptors','thunder','kings','grizzlies','spurs','wizards'];
     return nba.some(short=>(x===short&&y.endsWith(` ${short}`))||(y===short&&x.endsWith(` ${short}`)));

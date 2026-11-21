@@ -5,9 +5,10 @@ import {createHash} from 'node:crypto';
 import {streamTier,excludedCodec} from '../shared/stream-tier.js';
 import {addonFixture} from '../src/addon-fixture.js';
 import {catalogApi} from './catalog-api.mjs';
+import {addonCatalogUrl} from './addon-catalog-source.mjs';
 import {ensureLocalRelay,ensureLocalRestream} from './local-relay-process.mjs';
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
-import {parseDaddySchedule} from '../src/daddy-matching.js';
+import {parseDaddySchedule,channelIdentity} from '../src/daddy-matching.js';
 import {normalizeLiveScore,includeCatalogEvent} from '../src/livescore-catalog.js';
 import {fixtureKey,parsePlaylist,playlistIndex,prepareFixture,createPlaybackResolver,prioritizeChannels} from './daily-channel-core.mjs';
 const root=pathToFileURL(join(dataRoot,'daily-channels')+sep);
@@ -146,11 +147,35 @@ export async function prepareDailyChannels(){
  })().finally(()=>{preparing=null;});
  return preparing;
 }
+const addonChannelChecks=new Map();
+async function addonChannelFallback(fixture){
+ if(!fixture.eventId || !Number.isFinite(Number(fixture.start)) || Number(fixture.start)>Date.now()+30*60000)return [];
+ const key=fixtureKey(fixture),hit=addonChannelChecks.get(key);
+ if(hit&&hit.expires>Date.now())return hit.job;
+ const job=(async()=>{
+  const url=new URL(await addonCatalogUrl('sports_fight',0));
+  url.pathname=url.pathname.replace(/\/catalog\/sport\/[^/]+$/,`/stream/sport/${encodeURIComponent(fixture.eventId)}.json`);url.search='';
+  const response=await fetch(url,{signal:AbortSignal.timeout(15000)});
+  if(!response.ok)throw Error('Addon channel names unavailable');
+  const data=await response.json();if(!Array.isArray(data.streams))throw Error('Invalid addon streams');
+  const index=await loadPlaylist(),channels=new Map();
+  for(const source of data.streams){
+   const name=String(source.channelName||source.name||source.title||'').normalize('NFKC').replace(/^\s*🔒\s*/u,'').replace(/^Leaf\s*\([^)]*\)\s*[·:-]\s*/i,'').replace(/^\((?:FHD|HD|UHD|4K)\)\s*:\s*/i,'').split(/\s+·\s+|\n/)[0].trim();
+   const identity=channelIdentity(name);
+   const candidates=identity.region?index.get(JSON.stringify(identity))||[]:(index.byName.get(identity.name)||[]).map(item=>item.entry);
+   for(const entry of candidates)if(!excludedCodec(entry))channels.set(entry.id,entry);
+  }
+  return prioritizeChannels([...channels.values()]).slice(0,8).map(streamTier);
+ })().catch(()=>[]);
+ addonChannelChecks.set(key,{expires:Date.now()+5*60000,job});
+ while(addonChannelChecks.size>256)addonChannelChecks.delete(addonChannelChecks.keys().next().value);
+ return job;
+}
 export async function listDailyChannels(fixture){
  if(blockedBasketballPlayback(fixture))return {channels:[],match:null,complete:true};
  await load();const key=fixtureKey(fixture);const saved=database.matches[key];
  const savedChannels=saved?.channels.filter(c=>!excludedCodec(c));
- if(savedChannels?.length||saved?.preparedDay===day())return {key,channels:prioritizeChannels(savedChannels||[]).map(streamTier).map(({url,...c})=>c),match:saved.match,complete:true};
+ if(savedChannels?.length)return {key,channels:prioritizeChannels(savedChannels).map(streamTier).map(({url,...c})=>c),match:saved.match,complete:true};
  // An unprepared fixture can still use the index already built by the daily scan.
  const index=dailyPlaylist?.index||resources?.index;
  if(index){
@@ -161,6 +186,9 @@ export async function listDailyChannels(fixture){
    return {key,channels:prepared.channels.map(({url,...channel})=>channel),match:prepared.match,complete:true};
   }
  }
+ const channels=await addonChannelFallback(fixture);
+ if(channels.length){database.matches[key]={fixture,channels,match:null,preparedDay:day()};void save().catch(()=>{});return {key,channels:channels.map(({url,...channel})=>channel),match:null,complete:true};}
+ if(saved?.preparedDay===day())return {key,channels:[],match:saved.match,complete:true};
  if(!saved)database.matches[key]={fixture,match:null,channels:[]};
  void prepareDailyChannels().catch(()=>{});
  return {key,channels:[],match:null,complete:false};
