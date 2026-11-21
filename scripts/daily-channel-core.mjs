@@ -4,6 +4,11 @@ import { channelIdentity, matchDaddyEvent, matchesIptvEvent } from '../src/daddy
 export const fixtureKey = f => createHash('sha256').update(JSON.stringify(f.eventId ? [f.sport,f.eventId] : [f.sport, Number(f.start), f.home, f.away])).digest('hex').slice(0,24);
 export const channelKey = url => createHash('sha256').update(url).digest('hex').slice(0,24);
 const identity = name => JSON.stringify(channelIdentity(name));
+const teamFeedSports = {
+  EPL:'football', EFL:'football', CHAMP:'football', CHAMPIONSHIP:'football', L1:'football', L2:'football', SPFL:'football', SPL:'football', MLS:'football',
+  NFL:'american-football', NHL:'hockey', MLB:'baseball', NBA:'basketball', WNBA:'basketball', NRL:'rugby', RUGBY:'rugby', AFL:'afl',
+  TENNIS:'tennis', CRICKET:'cricket', F1:'motor-sports', MOTOGP:'motor-sports', UFC:'fight', WWE:'fight', BOXING:'fight', GOLF:'golf', DARTS:'darts', BILLIARDS:'billiards',
+};
 export function prioritizeChannels(channels) {
   const priority = channel => /^(?:us|uk)$/.test(channelIdentity(channel.name).region) ? 0 : 1;
   return [...channels].sort((a,b) => priority(a)-priority(b));
@@ -35,6 +40,11 @@ export function playlistIndex(entries) {
     index.byName.get(channel.name).push({ entry, region: channel.region });
   }
   index.eventChannels=entries.filter(entry=>!excludedCodec(entry)).filter(entry=>/\s+(?:vs?\.?|versus)\s+|^(?:live|next)\s*\||^(?:UFC\s+\d|WWE\s+(?:Monday Night Raw|Friday Night SmackDown|NXT)|AEW\s+(?:Dynamite|Collision)|Oktagon\s+\d)/i.test(entry.name));
+  index.teamChannels=entries.filter(entry=>!excludedCodec(entry)).flatMap(entry=>{
+    const label=entry.name.match(/^([A-Z0-9 ]+):\s*(.+)$/i);
+    const sport=label&&teamFeedSports[label[1].toUpperCase()];
+    return sport && !/[|@]|\s+(?:vs?\.?|versus)\s+/i.test(label[2]) ? [{entry,sport,team:label[2]}] : [];
+  });
   return index;
 }
 export function prepareFixture(fixture, events, index) {
@@ -60,6 +70,17 @@ export function prepareFixture(fixture, events, index) {
   if(!refs.length) {
     for(const entry of index.eventChannels || [])if(matchesIptvEvent(entry.name,fixture)&&!seen.has(entry.id)){
       seen.add(entry.id);refs.push({...entry,...(match?{daddyChannel:match.name}:{}),eventFallback:true});
+    }
+  }
+  if(!refs.length){
+    for(const {entry,sport,team:club} of index.teamChannels||[]){
+      if(sport!==fixture.sport)continue;
+      const matches=fixture.away
+        ? matchesIptvEvent(`${club} vs ${fixture.away}`,fixture)||matchesIptvEvent(`${fixture.home} vs ${club}`,fixture)
+        : matchesIptvEvent(club,fixture);
+      if(matches){
+        if(!seen.has(entry.id)){seen.add(entry.id);refs.push({...entry,eventFallback:true});}
+      }
     }
   }
   const fourK=refs.filter(isFourK);

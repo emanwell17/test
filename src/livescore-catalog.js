@@ -9,7 +9,7 @@ export const LEAGUES = {
     ['England', 'Championship|EFL Championship'], ['Scotland', 'Premiership'], ['Spain', 'LaLiga 2|Segunda Division'],
     ['Brazil', 'Serie A'], ['Romania', 'Liga 1|Liga I|Superliga'], ['Greece', 'Super League'], ['Denmark', 'Superliga'],
     ['Portugal', 'Primeira Liga|Liga Portugal'], ['Argentina', 'Primera Division|Liga Profesional'], ['Netherlands', 'Eredivisie'],
-    ['Austria', 'Bundesliga|Cup|OFB Cup'], ['Scotland', 'FA Cup|Scottish Cup'], ['England', 'League One'], ['France', 'Ligue 2'],
+    ['Austria', 'Bundesliga|Cup|OFB Cup'], ['Scotland', 'FA Cup|Scottish Cup'], ['England', 'League One|League Two|League 2|EFL League Two'], ['France', 'Ligue 2'],
     ['Germany', '2 Bundesliga|Bundesliga 2'], ['', 'Copa Sudamericana|Copa Libertadores'], ['Australia', 'A League|A League Men'],
     ['Poland', 'Ekstraklasa'], ['Germany', 'Bundesliga|DFB Pokal'], ['', 'Champions League|Europa League|Conference League'],
     ['Saudi Arabia', 'Pro League|Saudi Pro League|Saudi Professional League'], ['Turkiye|Turkey', 'Super Lig'], ['Belgium', 'Pro League|First Division A'],
@@ -44,7 +44,7 @@ export function normalizeLiveScore(feed, sport) {
     const logo = path => !path ? '' : /^https?:\/\//.test(path) ? path : `https://lsm-static-prod.livescore.com/medium/${path.replace(/^\//, '')}`;
     const home = event.T1?.[0]?.Nm || event.Enm || '', away = event.T2?.[0]?.Nm || '';
     return { id: String(event.Eid), _liveScoreId: String(event.Eid), _sport: sport, _catalogSource: 'livescore',
-      _league: stage.Snm || stage.CompN || stage.Cnm, _leagueId: stage.CompId || stage.Sid,
+      _league: stage.CompN?.trim() || stage.Snm || stage.Cnm, _leagueId: stage.CompId || stage.Sid,
       home_team_name: home, away_team_name: away, home_team_logo: logo(event.T1?.[0]?.Img), away_team_logo: logo(event.T2?.[0]?.Img),
       _singleEvent: !away, timestamp, status: [2, 3, 10].includes(+event.Esid) ? 'live' : +event.Esid === 6 ? 'ft' : event.Eps || 'NS',
       ...(event.Tr1 != null && event.Tr2 != null ? { score: { current: { home: event.Tr1, away: event.Tr2 } } } : {}),
