@@ -83,16 +83,22 @@ export function prepareFixture(fixture, events, index) {
       }
     }
   }
+  let preferredCanalRaw;
   if(fixture.sport==='football' && [fixture.home,fixture.away].some(name=>/^arsenal(?: fc)?$/i.test(String(name).trim()))){
     const canalFoot=/^FR:\s*CANAL\+\s*FOOT\b/i;
     const raw=(index.get(identity('FR: CANAL+ FOOT'))||[]).find(entry=>/\bRAW\b/i.test(entry.name.normalize('NFKC')));
     if(raw && refs.some(entry=>canalFoot.test(entry.name)&&isFourK(entry))){
+      preferredCanalRaw=raw;
       for(let i=refs.length-1;i>=0;i--)if(canalFoot.test(refs[i].name)&&isFourK(refs[i]))refs.splice(i,1);
       if(!refs.some(entry=>entry.id===raw.id))refs.unshift(raw);
     }
   }
   const fourK=refs.filter(isFourK);
   const chosen=prioritizeChannels(refs).slice(0,8);
+  if(preferredCanalRaw&&!chosen.some(entry=>entry.id===preferredCanalRaw.id)){
+    chosen.unshift(preferredCanalRaw);
+    if(chosen.length>8)chosen.pop();
+  }
   for(const r of fourK) if(!chosen.some(c=>c.id===r.id)) chosen.push(r);
   return { fixture, match:match?{name:match.name,timestamp:match.timestamp}:null, channels:prioritizeChannels(chosen).map(streamTier) };
 }
