@@ -149,7 +149,7 @@ export async function prepareDailyChannels(){
 }
 const addonChannelChecks=new Map();
 async function addonChannelFallback(fixture){
- if(!fixture.eventId || !Number.isFinite(Number(fixture.start)) || Number(fixture.start)>Date.now()+30*60000)return [];
+ if(!fixture.eventId || !Number.isFinite(Number(fixture.start)) || Number(fixture.start)>Date.now()+10*60000)return [];
  const key=fixtureKey(fixture),hit=addonChannelChecks.get(key);
  if(hit&&hit.expires>Date.now())return hit.job;
  const job=(async()=>{
@@ -188,6 +188,7 @@ export async function listDailyChannels(fixture){
  }
  const channels=await addonChannelFallback(fixture);
  if(channels.length){database.matches[key]={fixture,channels,match:null,preparedDay:day()};void save().catch(()=>{});return {key,channels:channels.map(({url,...channel})=>channel),match:null,complete:true};}
+ if(fixture.eventId && Number(fixture.start)>Date.now())return {key,channels:[],match:saved?.match||null,complete:true,waitingForEvent:true};
  if(saved?.preparedDay===day())return {key,channels:[],match:saved.match,complete:true};
  if(!saved)database.matches[key]={fixture,match:null,channels:[]};
  void prepareDailyChannels().catch(()=>{});
