@@ -39,7 +39,7 @@ export function playlistIndex(entries) {
     if (!index.byName.has(channel.name)) index.byName.set(channel.name, []);
     index.byName.get(channel.name).push({ entry, region: channel.region });
   }
-  index.eventChannels=entries.filter(entry=>!excludedCodec(entry)).filter(entry=>/\s+(?:vs?\.?|versus)\s+|^(?:live|next)\s*\||^(?:UFC\s+\d|WWE\s+(?:Monday Night Raw|Friday Night SmackDown|NXT)|AEW\s+(?:Dynamite|Collision)|Oktagon\s+\d)/i.test(entry.name));
+  index.eventChannels=entries.filter(entry=>!excludedCodec(entry)).filter(entry=>/\s+(?:vs?\.?|versus|at)\s+|^(?:live|next)\s*\||^(?:UFC\s+\d|WWE\s+(?:Monday Night Raw|Friday Night SmackDown|NXT)|AEW\s+(?:Dynamite|Collision)|Oktagon\s+\d)/i.test(entry.name));
   index.teamChannels=entries.filter(entry=>!excludedCodec(entry)).flatMap(entry=>{
     const label=entry.name.match(/^([A-Z0-9 ]+):\s*(.+)$/i);
     const sport=label&&teamFeedSports[label[1].toUpperCase()];

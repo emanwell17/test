@@ -36,13 +36,18 @@ export function matchesIptvEvent(name, fixture) {
       : name;
     return matchesSingleEvent(eventTitle,fixture);
   }
-  const label = String(name).split('|').find(part=>/\s+(?:vs?\.?|versus)\s+/i.test(part)||/^\s*(?:EFL\s+)?CHAMPIONSHIP\s+.+\s+-\s+.+/i.test(part));
+  const label = String(name).split('|').find(part=>/\s+(?:vs?\.?|versus)\s+/i.test(part)||(fixture.sport==='hockey'&&/\s+at\s+/i.test(part))||/^\s*(?:(?:EFL\s+)?CHAMPIONSHIP|NHL)\s+.+\s+-\s+.+/i.test(part));
   if(!label)return false;
-  const sides=label.replace(/^\s*(?:EFL\s+)?CHAMPIONSHIP\s+/i,'').split(/\s+(?:vs?\.?|versus)\s+/i.test(label)?/\s+(?:vs?\.?|versus)\s+/i:/\s+-\s+/).map(side=>side.split('@')[0].replace(/^.*?:\s*/, '').replace(/^\s*[A-Z]{2,4}\s*-\s*/, '').replace(/\s*(?:@|\(|Strong8K|[ᴸᶦᵛᵉ]).*$/i, '').trim());
+  const sides=label.replace(/^\s*(?:(?:EFL\s+)?CHAMPIONSHIP|NHL(?: Hockey)?)\s*:?\s*/i,'').split(/\s+(?:vs?\.?|versus|at)\s+/i.test(label)?/\s+(?:vs?\.?|versus|at)\s+/i:/\s+-\s+/).map(side=>side.split('@')[0].replace(/^.*?:\s*/, '').replace(/^\s*[A-Z]{2,4}\s*-\s*/, '').replace(/\s*(?:@|\(|Strong8K|[ᴸᶦᵛᵉ]).*$/i, '').trim());
   if(sides.length!==2)return false;
   const equal=(a,b)=>{
     const x=team(a),y=team(b);
     if(x===y)return true;
+    if(fixture.sport==='hockey'){
+      const clubs={'san jose':'san jose sharks',seattle:'seattle kraken'};
+      const clean=value=>value.replace(/\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d.*$/i,'').replace(/\s+possible overtime$/i,'');
+      return (clubs[clean(x)]||clean(x))===(clubs[clean(y)]||clean(y));
+    }
     if(fixture.sport==='fight'){
       const surname=y.split(' ').at(-1);
       return Boolean(surname?.length>=4 && x.split(' ').includes(surname));
