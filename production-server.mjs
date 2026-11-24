@@ -19,7 +19,13 @@ const {relayPort,restreamPort}=await import('./scripts/runtime-config.mjs');
 const [{createRelay},{startRestreamServer},{startDailyPreparation,listDailyChannels,playDailyChannel},{localPremiumAccess},{catalogApi}]=await Promise.all([
  import('./relay.mjs'),import('./scripts/local-restream.mjs'),import('./scripts/daily-channels.mjs'),import('./scripts/local-premium-access.mjs'),import('./scripts/catalog-api.mjs'),
 ]);
-const origins=new Set([SITE_ORIGIN]);
+let adminOrigin='';
+if(process.env.ADMIN_ORIGIN){
+ const configured=new URL(process.env.ADMIN_ORIGIN);
+ if(configured.protocol!=='https:'||configured.username||configured.password||configured.pathname!=='/'||configured.search||configured.hash)throw Error('ADMIN_ORIGIN must be an HTTPS origin');
+ adminOrigin=configured.origin;
+}
+const origins=new Set([SITE_ORIGIN,...(adminOrigin?[adminOrigin]:[])]);
 const relay=createRelay({secret:process.env.RELAY_SECRET,apiKey:process.env.SESSION_API_KEY,allowedOrigins:[...origins],ttlSeconds:600,cacheBytes:Math.max(8,Math.min(256,Number(process.env.CACHE_MAX_MB)||64))*1024*1024});
 const internal=http.createServer((req,res)=>{relay(req,res).catch(()=>{if(!res.headersSent)res.writeHead(502);res.end('Relay unavailable');});});
 await new Promise((resolve,reject)=>{internal.once('error',reject);internal.listen(relayPort,'127.0.0.1',resolve);});
@@ -31,7 +37,7 @@ const send=(res,status,data,cors={})=>{res.writeHead(status,{'Content-Type':'app
 const publicServer=http.createServer(async(req,res)=>{
  const origin=req.headers.origin;const cors=origins.has(origin)?{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'Content-Type, Authorization, X-Device-ID, Range','Access-Control-Allow-Methods':'GET, HEAD, POST, OPTIONS',Vary:'Origin'}:{};
  const url=new URL(req.url,'http://backend.internal');
- if(!siteRequestAllowed(req.method,url.pathname,req.headers)){send(res,403,{error:'Site access required'});return;}
+ if(!siteRequestAllowed(req.method,url.pathname,req.headers,adminOrigin)){send(res,403,{error:'Site access required'});return;}
  if(req.method==='OPTIONS'){res.writeHead(204,cors);res.end();return;}
  try{
   if(url.pathname==='/api/site-settings'||url.pathname.startsWith('/api/admin/site/')){

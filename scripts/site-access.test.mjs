@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {siteRequestAllowed} from './site-access.mjs';
+test('separate admin origin is exact and restricts administration to its host',()=>{
+ const admin='https://private-admin.example.test';
+ assert(siteRequestAllowed('POST','/api/admin/site/change',{origin:admin},admin));
+ assert(siteRequestAllowed('GET','/api/livescore/soccer/20261124',{origin:admin},admin));
+ assert.equal(siteRequestAllowed('POST','/api/admin/site/change',{origin:'https://scorezonetv.live'},admin),false);
+ assert.equal(siteRequestAllowed('POST','/api/admin/site/change',{origin:admin+'.evil.test'},admin),false);
+ assert.equal(siteRequestAllowed('POST','/api/sessions',{origin:admin},admin),false);
+});
 test('only the exact ScoreZone origin can use public APIs',()=>{
  for(const origin of ['https://www.scorezonetv.live','https://evil.test','null','https://scorezonetv.live.evil.test',undefined])assert.equal(siteRequestAllowed('POST','/api/matches/playback',{origin}),false);
  assert.equal(siteRequestAllowed('POST','/api/matches/playback',{origin:'https://scorezonetv.live'}),true);
