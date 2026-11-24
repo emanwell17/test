@@ -21,6 +21,17 @@ test('event fallback accepts both NBA teams in reversed and abbreviated labels b
  assert.equal(matchesIptvEvent('Next | Lakers vs. Warriors | all | 25-10-2026 | 02:00 (GMT)',fixture),false);
  assert.equal(matchesIptvEvent('END | Lakers vs. Warriors | US: PPV',fixture),false);
 });
+test('international football uses the IPTV event when DaddyLive has no usable channels',()=>{
+ const fixture={home:'Lebanon',away:'Palestine',sport:'football',start:Date.UTC(2026,10,17,16)};
+ const event={name:'Lebanon vs Palestine',sport:'football',timestamp:fixture.start,channels:[]};
+ const index=playlistIndex([
+  {id:'correct',name:'Live | Lebanon vs Palestine | US: PPV'},
+  {id:'wrong',name:'Live | Lebanon vs Jordan | US: PPV'},
+ ]);
+ for(const schedule of [[],[event],[{...event,channels:[{name:'Unavailable broadcaster'}]}]]){
+  assert.deepEqual(prepareFixture(fixture,schedule,index).channels.map(channel=>channel.id),['correct']);
+ }
+});
 test('event fallback works for LiveScore fixtures missing from DaddyLive and preserves normal channel matches',()=>{
  const event={name:'NBA : Golden State Warriors vs Los Angeles Lakers',sport:'basketball',timestamp:fixture.start,channels:[{name:'NBA League Pass'}]};
  const entry={id:'event',name:'Live | Lakers vs. Warriors | US: PPV 123',url:'https://stored/event'};
@@ -28,5 +39,5 @@ test('event fallback works for LiveScore fixtures missing from DaddyLive and pre
  assert.equal(prepareFixture(fixture,[],playlistIndex([entry])).channels[0].id,'event');
  assert.equal(prepareFixture({...fixture,away:'LA Clippers'},[],playlistIndex([entry])).channels.length,0);
  const normal={id:'normal',name:'NBA League Pass',url:'https://stored/normal'};
- assert.deepEqual(prepareFixture(fixture,[event],playlistIndex([normal,entry])).channels.map(c=>c.id),['normal']);
+ assert.deepEqual(prepareFixture(fixture,[event],playlistIndex([normal,entry])).channels.map(c=>c.id),['event','normal']);
 });

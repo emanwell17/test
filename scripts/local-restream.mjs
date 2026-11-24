@@ -1,4 +1,5 @@
 import {dataRoot,managed,relayInternalOrigin,restreamInternalOrigin,restreamPort} from './runtime-config.mjs';
+import {tmpdir} from 'node:os';
 import http from 'node:http';
 import {spawn} from 'node:child_process';
 import {createHmac,timingSafeEqual} from 'node:crypto';
@@ -25,7 +26,7 @@ export function createFeedManager({start,now=Date.now,idleMs=60000,maxFeeds=8}){
 export async function startRestreamServer(){
  const secret=process.env.RELAY_SECRET,apiKey=process.env.SESSION_API_KEY;
  if(!secret||!apiKey)throw Error('Restream credentials missing');
- const root=join(dataRoot,'restream');await mkdir(root,{recursive:true});
+ const root=managed?join(tmpdir(),'scorezone-restream'):join(dataRoot,'restream');await mkdir(root,{recursive:true});
  const configs=new Map();
  try{
   const stored=JSON.parse(await readFile(join(root,'inputs.json'),'utf8'));

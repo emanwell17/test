@@ -5,6 +5,8 @@ import {createHash} from 'node:crypto';
 import {streamTier,excludedCodec} from '../shared/stream-tier.js';
 import {addonFixture} from '../src/addon-fixture.js';
 import {catalogApi} from './catalog-api.mjs';
+import {adminSettings,fixtureDisabled} from './admin-store.mjs';
+import {fixtureIdentity,orderChannels} from '../shared/admin-catalog.js';
 import {addonCatalogUrl} from './addon-catalog-source.mjs';
 import {ensureLocalRelay,ensureLocalRestream} from './local-relay-process.mjs';
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
@@ -128,8 +130,9 @@ export async function prepareDailyChannels(){
     if(!Array.isArray(feed.Stages))throw Error('Invalid catalog');
     const previous=new Date(`${today}T12:00:00Z`);previous.setUTCDate(previous.getUTCDate()-1);
     const previousFeed=await get(`https://prod-cdn-public-api.livescore.com/v1/api/app/date/${slug}/${previous.toISOString().slice(0,10).replaceAll('-','')}/0.0?locale=en&MD=1`).catch(()=>({Stages:[]}));
-    for(const event of [...normalizeLiveScore(previousFeed,sport),...normalizeLiveScore(feed,sport)].filter(e=>includeCatalogEvent(e))){
-     const fixture={home:event.home_team_name,away:event.away_team_name,sport,start:event.timestamp};
+    const settings=await adminSettings();
+    for(const event of [...normalizeLiveScore(previousFeed,sport,settings),...normalizeLiveScore(feed,sport,settings)].filter(e=>includeCatalogEvent(e))){
+     const fixture={home:event.home_team_name,away:event.away_team_name,sport,start:event.timestamp,competition:event._league};
      storeFixture(fixture,source);
     }
     database.completedSports.push(sport);await save();
@@ -171,7 +174,32 @@ async function addonChannelFallback(fixture){
  while(addonChannelChecks.size>256)addonChannelChecks.delete(addonChannelChecks.keys().next().value);
  return job;
 }
+export async function adminPlaylist(){
+ const index=await loadPlaylist();
+ return [...index.values()].flat();
+}
+async function configuredChannels(fixture,channels){
+ const settings=await adminSettings();
+ if(fixtureDisabled(fixture,settings))return [];
+ const rules=settings.streams[fixtureIdentity(fixture)]||{};
+ const entries=new Map(channels.map(channel=>[channel.id,channel]));
+ const additions=Object.entries(rules).filter(([id,rule])=>rule.enabled&&!entries.has(id));
+ if(additions.length){const playlist=new Map((await adminPlaylist()).map(entry=>[entry.id,entry]));for(const [id] of additions){const entry=playlist.get(id);if(entry)entries.set(id,entry);}}
+ const result=[...entries.values()].filter(channel=>rules[channel.id]?.enabled!==false&&!excludedCodec(channel)).map(channel=>streamTier({...channel,...(typeof rules[channel.id]?.locked==='boolean'?{adminLocked:rules[channel.id].locked}:{})}));
+ return orderChannels(result,settings.streamOrder?.[fixtureIdentity(fixture)]||[]);
+}
 export async function listDailyChannels(fixture){
+ if(blockedBasketballPlayback(fixture))return {channels:[],match:null,complete:true};
+ const settings=await adminSettings();
+ if(fixtureDisabled(fixture,settings))return {channels:[],match:null,complete:true};
+ const result=await automaticDailyChannels(fixture);
+ const record=database.matches[result.key];
+ if(record)record.fixture={...record.fixture,...fixture};
+ const channels=await configuredChannels(fixture,record?.channels||[]);
+ if(!record&&channels.length)database.matches[result.key]={fixture,channels:[],match:null};
+ return {...result,channels:channels.map(({url,...channel})=>channel),...(channels.length?{complete:true,waitingForEvent:false}:{})};
+}
+async function automaticDailyChannels(fixture){
  if(blockedBasketballPlayback(fixture))return {channels:[],match:null,complete:true};
  await load();const key=fixtureKey(fixture);const saved=database.matches[key];
  const savedChannels=saved?.channels.filter(c=>!excludedCodec(c));
@@ -249,7 +277,7 @@ function blockedBasketballPlayback(fixture){
 export async function playDailyChannel(matchKey,channelId,access=null){
  await load();const record=database.matches[matchKey];
  if(blockedBasketballPlayback(record?.fixture)){const error=Error('Playback unavailable');error.status=403;throw error;}
- const reference=record?.channels.find(c=>c.id===channelId);
+ const reference=record&&(await configuredChannels(record.fixture,record.channels||[])).find(c=>c.id===channelId);
  if(!reference || excludedCodec(reference))throw Error('Unknown channel');
  if(streamTier(reference).locked && (!access?.premium || access.expiresAt<=Date.now())){const error=Error('Premium required');error.status=403;throw error;}
  let session=await resolvePlayback(reference);

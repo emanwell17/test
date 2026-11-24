@@ -25,6 +25,8 @@ const internal=http.createServer((req,res)=>{relay(req,res).catch(()=>{if(!res.h
 await new Promise((resolve,reject)=>{internal.once('error',reject);internal.listen(relayPort,'127.0.0.1',resolve);});
 await startRestreamServer();
 const stopPreparation=startDailyPreparation();
+const {adminApi}=await import('./scripts/admin-api.mjs');
+const {adminPlaylist}=await import('./scripts/daily-channels.mjs');
 const send=(res,status,data,cors={})=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store',...cors});res.end(JSON.stringify(data));};
 const publicServer=http.createServer(async(req,res)=>{
  const origin=req.headers.origin;const cors=origins.has(origin)?{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'Content-Type, Authorization, X-Device-ID, Range','Access-Control-Allow-Methods':'GET, HEAD, POST, OPTIONS',Vary:'Origin'}:{};
@@ -32,7 +34,12 @@ const publicServer=http.createServer(async(req,res)=>{
  if(!siteRequestAllowed(req.method,url.pathname,req.headers)){send(res,403,{error:'Site access required'});return;}
  if(req.method==='OPTIONS'){res.writeHead(204,cors);res.end();return;}
  try{
-  if(url.pathname==='/healthz'){send(res,200,{ok:true,version:'catalog-restream-v1',ffmpeg:true,configured:Boolean(process.env.IPTV_PLAYLIST_URL),features:['livescore','addon-fallback','daily-channels','shared-restream','shared-cached-relay','segment-prefetch','scorezone-only-origin','4k-premium','hevc-filter']},cors);return;}
+  if(url.pathname==='/api/site-settings'||url.pathname.startsWith('/api/admin/site/')){
+   let body='';if(req.method==='POST')for await(const chunk of req){body+=chunk;if(body.length>16000)throw Error('Request too large');}
+   const response=await adminApi(new Request(url,{method:req.method,headers:req.headers,...(req.method==='POST'?{body}:{})}),{playlist:adminPlaylist,listChannels:listDailyChannels});
+   send(res,response.status,await response.json(),cors);return;
+  }
+  if(url.pathname==='/healthz'){send(res,200,{ok:true,version:'catalog-restream-v1',adminConfigured:Boolean(process.env.ADMIN_TOKEN),ffmpeg:true,configured:Boolean(process.env.IPTV_PLAYLIST_URL),features:['livescore','addon-fallback','daily-channels','shared-restream','shared-cached-relay','segment-prefetch','scorezone-only-origin','4k-premium','hevc-filter','site-admin']},cors);return;}
   if(url.pathname.startsWith('/restream/')){
    if(!['GET','HEAD'].includes(req.method)){send(res,405,{error:'Method not allowed'},cors);return;}
    const upstream=http.request({hostname:'127.0.0.1',port:restreamPort,path:req.url,method:req.method,headers:{...(origin?{Origin:origin}:{}),...(req.headers.range?{Range:req.headers.range}:{})}},response=>{res.writeHead(response.statusCode,response.headers);response.pipe(res);});

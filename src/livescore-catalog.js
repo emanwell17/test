@@ -26,8 +26,11 @@ export const LEAGUES = {
   cricket: [['', 'International Test Match|Test Series|Test Matches|ODI Series|One Day Internationals|T20I Series|Twenty20 Internationals|ICC World Test Championship|Big Bash League|The Hundred|SA20|Caribbean Premier League']],
 };
 const key = value => String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-export function selectedLeague(sport, stage) {
+export function selectedLeague(sport, stage, settings = {}) {
   if (isYouthEvent({name:[stage.Snm,stage.CompN,stage.Cnm].filter(Boolean).join(' ')})) return false;
+  const custom = (settings.leagues || []).filter(rule => rule.sport === sport && (!rule.country || rule.country.split('|').some(country=>key(country)===key(stage.Cnm))) && [stage.Snm,stage.CompN].some(name => key(name) === key(rule.name)));
+  if (custom.some(rule => !rule.enabled)) return false;
+  if (custom.some(rule => rule.enabled)) return true;
   const rules = LEAGUES[sport];
   // These sports had no individual competition selections on the config page.
   if (!rules) return ['billiards', 'afl', 'darts', 'other'].includes(sport);
@@ -37,14 +40,14 @@ export function selectedLeague(sport, stage) {
   return rules.some(([countries, aliases]) => (!countries || countries.split('|').some(c => key(c) === country)) &&
     aliases.split('|').some(alias => names.some(name => name === key(alias) || name.startsWith(`${key(alias)} `))));
 }
-export function normalizeLiveScore(feed, sport) {
-  return (feed.Stages || []).filter(stage => selectedLeague(sport, stage)).flatMap(stage => (stage.Events || []).map(event => {
+export function normalizeLiveScore(feed, sport, settings = {}) {
+  return (feed.Stages || []).filter(stage => selectedLeague(sport, stage, settings)).flatMap(stage => (stage.Events || []).map(event => {
     const stamp = String(event.Esd || '');
     const timestamp = /^\d{14}$/.test(stamp) ? Date.UTC(+stamp.slice(0, 4), +stamp.slice(4, 6) - 1, +stamp.slice(6, 8), +stamp.slice(8, 10), +stamp.slice(10, 12), +stamp.slice(12, 14)) : 0;
     const logo = path => !path ? '' : /^https?:\/\//.test(path) ? path : `https://lsm-static-prod.livescore.com/medium/${path.replace(/^\//, '')}`;
     const home = event.T1?.[0]?.Nm || event.Enm || '', away = event.T2?.[0]?.Nm || '';
     return { id: String(event.Eid), _liveScoreId: String(event.Eid), _sport: sport, _catalogSource: 'livescore',
-      _league: stage.CompN?.trim() || stage.Snm || stage.Cnm, _leagueId: stage.CompId || stage.Sid,
+      _league: stage.CompN?.trim() || stage.Snm || stage.Cnm, _leagueId: stage.CompId || stage.Sid, _country: stage.Cnm,
       home_team_name: home, away_team_name: away, home_team_logo: logo(event.T1?.[0]?.Img), away_team_logo: logo(event.T2?.[0]?.Img),
       _singleEvent: !away, timestamp, status: [2, 3, 10].includes(+event.Esid) ? 'live' : +event.Esid === 6 ? 'ft' : event.Eps || 'NS',
       ...(event.Tr1 != null && event.Tr2 != null ? { score: { current: { home: event.Tr1, away: event.Tr2 } } } : {}),
