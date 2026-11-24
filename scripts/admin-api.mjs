@@ -1,4 +1,5 @@
-import {createHash,timingSafeEqual,randomUUID} from 'node:crypto';
+import {randomUUID} from 'node:crypto';
+import {adminAuthentication,issueAdminSession,revokeAdminSession} from './admin-sessions.mjs';
 import {adminSettings,updateAdminSettings,publicSettings} from './admin-store.mjs';
 import {fixtureIdentity,playlistCountry,applyCatalogSettings} from '../shared/admin-catalog.js';
 import {LEAGUES,selectedLeague,isYouthEvent} from '../src/livescore-catalog.js';
@@ -18,12 +19,20 @@ export async function adminApi(request,{playlist,listChannels,catalog=catalogApi
  const url=new URL(request.url);
  if(url.pathname==='/api/site-settings'&&request.method==='GET')return Response.json(publicSettings(await adminSettings()));
  if(!url.pathname.startsWith('/api/admin/site/'))return null;
- const expected=String(process.env.ADMIN_TOKEN||'');
+ const expected=String(process.env.ADMIN_TOKEN||'').trim();
  if(!expected)return Response.json({error:'Set ADMIN_TOKEN on the backend to enable administration'},{status:503});
- const supplied=(request.headers.get('authorization')||'').replace(/^Bearer\s+/i,'');
- const digest=value=>createHash('sha256').update(value).digest();
- if(!timingSafeEqual(digest(expected),digest(supplied)))return Response.json({error:'Invalid admin token'},{status:401});
+ const supplied=(request.headers.get('authorization')||'').replace(/^Bearer\s+/i,'').trim();
+ const authentication=await adminAuthentication(supplied,expected);
+ if(!authentication)return Response.json({error:'Your admin session expired or the token is invalid. Sign in again.'},{status:401});
  try{
+  if(url.pathname.endsWith('/login')&&request.method==='POST'){
+   if(!authentication.master)return Response.json({error:'Enter the admin token to sign in again'},{status:401});
+   const body=await request.json();return Response.json(await issueAdminSession(expected,body.remember===true));
+  }
+  if(url.pathname.endsWith('/logout')&&request.method==='POST'){
+   if(!authentication.master)await revokeAdminSession(supplied);
+   return Response.json({ok:true});
+  }
   if(request.method==='GET'&&url.pathname.endsWith('/state'))return Response.json({...await adminSettings(),defaultLeagues:LEAGUES});
   if(request.method==='GET'&&url.pathname.endsWith('/leagues')){
    const sport=url.searchParams.get('sport'),query=(url.searchParams.get('q')||'').trim();

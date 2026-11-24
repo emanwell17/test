@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -28,6 +28,16 @@ test('admin controls persist, protect playlist access, and enforce removal and l
  const save=async body=>{const result=await request('admin/site/change',body);assert.equal(result.status,200,JSON.stringify(await result.clone().json()));};
  try{
   assert.equal((await request('admin/site/playlist',null,'wrong')).status,401);
+  const login=await(await request('admin/site/login',{remember:true})).json();
+  assert.match(login.token,/^SZA-/);assert(login.expiresAt>Date.now()+29*86400000);
+  assert.equal((await request('admin/site/state',null,login.token)).status,200);
+  assert.equal((await request('admin/site/login',{remember:true},login.token)).status,401);
+  const {adminAuthentication}=await import('./admin-sessions.mjs');
+  assert.equal(await adminAuthentication(login.token,process.env.ADMIN_TOKEN,login.expiresAt+1),null);
+  assert.equal(await adminAuthentication(login.token,'rotated-master'),null);
+  const disk=await readFile(join(directory,'admin-sessions.json'),'utf8');assert(!disk.includes(login.token));assert(!disk.includes(process.env.ADMIN_TOKEN));
+  assert.equal((await request('admin/site/logout',{},login.token)).status,200);
+  assert.equal((await request('admin/site/state',null,login.token)).status,401);
   const before=await(await request('admin/site/leagues?sport=football')).json();assert.equal(before.leagues[0].enabled,false);
   const listed=await(await request('admin/site/playlist')).json();assert.equal(listed.channels[0].url,undefined);
   assert.deepEqual(listed.countries.map(country=>country.code).sort(),['FR','UK']);
