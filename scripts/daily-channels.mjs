@@ -17,7 +17,7 @@ const root=pathToFileURL(join(dataRoot,'daily-channels')+sep);
 const sports={football:'soccer',basketball:'basketball','american-football':'american-football',hockey:'hockey',baseball:'baseball','motor-sports':'motorsport',fight:'boxing',tennis:'tennis',rugby:'rugby-union',golf:'golf',billiards:'billiards',afl:'afl',darts:'darts',cricket:'cricket',other:'other'};
 const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Lagos',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 let loaded, database, preparing, timer, resources, resourcePending;
-const cacheVersion = 16;
+const cacheVersion = 17;
 let dailyPlaylist, playlistPending;
 let playlistDiskPending, playlistRetryAt=0;
 async function get(url,type='json') { const r=await fetch(url,{signal:AbortSignal.timeout(25000)});if(!r.ok){const error=Error(`Upstream HTTP ${r.status}`);error.status=r.status;throw error;}return type==='text'?r.text():r.json(); }
@@ -37,14 +37,14 @@ async function load(){
 }
 let saving=Promise.resolve();
 function save(){saving=saving.catch(()=>{}).then(async()=>{await mkdir(root,{recursive:true});await writeFile(new URL(`current-${process.pid}.tmp`,root),JSON.stringify(database));await rename(new URL(`current-${process.pid}.tmp`,root),new URL('current.json',root));});return saving;}
-async function loadPlaylist(){
+async function loadPlaylist({refresh=false}={}){
  const today=day();
  const url=await configuredPlaylistUrl();
  const fingerprint=createHash('sha256').update(url).digest('hex');
  if(!playlistDiskPending)playlistDiskPending=(async()=>{
   try{
    const stored=JSON.parse(await readFile(new URL('playlist-index.json',root),'utf8'));
-   if(stored.fingerprint===fingerprint&&Array.isArray(stored.entries)&&Date.now()-stored.savedAt<7*86400000){
+   if(stored.version===cacheVersion&&stored.fingerprint===fingerprint&&Array.isArray(stored.entries)&&Date.now()-stored.savedAt<7*86400000){
     const text=stored.entries.map(entry=>`#EXTINF:-1,${entry.name}\n${entry.url}`).join('\n');
     const entries=parsePlaylist(text,url);
     if(entries.length)dailyPlaylist={day:stored.day,index:playlistIndex(entries)};
@@ -52,8 +52,8 @@ async function loadPlaylist(){
   }catch{}
  })();
  await playlistDiskPending;
- if(dailyPlaylist?.day===today)return dailyPlaylist.index;
- if(Date.now()<playlistRetryAt){
+ if(!refresh&&dailyPlaylist?.day===today)return dailyPlaylist.index;
+ if(!refresh&&Date.now()<playlistRetryAt){
   if(dailyPlaylist)return dailyPlaylist.index;
   throw Error('Playlist refresh unavailable');
  }
@@ -64,12 +64,12 @@ async function loadPlaylist(){
   try{
    await mkdir(root,{recursive:true});
    const temporary=new URL(`playlist-index-${process.pid}.tmp`,root);
-   await writeFile(temporary,JSON.stringify({day:today,fingerprint,savedAt:Date.now(),entries}));
+   await writeFile(temporary,JSON.stringify({version:cacheVersion,day:today,fingerprint,savedAt:Date.now(),entries}));
    await rename(temporary,new URL('playlist-index.json',root));
   }catch{}
   return dailyPlaylist.index;
  })().catch(error=>{playlistRetryAt=Date.now()+30000;throw error;}).finally(()=>playlistPending=null);
- if(dailyPlaylist){
+ if(dailyPlaylist&&!refresh){
   void playlistPending.catch(()=>{});
   return dailyPlaylist.index;
  }
@@ -174,8 +174,8 @@ async function addonChannelFallback(fixture){
  while(addonChannelChecks.size>256)addonChannelChecks.delete(addonChannelChecks.keys().next().value);
  return job;
 }
-export async function adminPlaylist(){
- const index=await loadPlaylist();
+export async function adminPlaylist(options){
+ const index=await loadPlaylist(options);
  return [...index.values()].flat();
 }
 async function configuredChannels(fixture,channels){

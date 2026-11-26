@@ -44,7 +44,7 @@ export async function adminApi(request,{playlist,listChannels,catalog=catalogApi
   if(request.method==='GET'&&url.pathname.endsWith('/playlist')){
    const q=(url.searchParams.get('q')||'').toLowerCase();const offset=Math.max(0,Number(url.searchParams.get('offset'))||0);
    const country=url.searchParams.get('country')||'';
-   const all=await playlist();
+   const all=await playlist({refresh:url.searchParams.get('refresh')==='1'});
    const display=new Intl.DisplayNames(['en'],{type:'region'});
    const countries=[...new Set(all.map(entry=>playlistCountry(entry.name)).filter(Boolean))].map(code=>({code,name:display.of(code==='UK'?'GB':code)})).sort((a,b)=>a.name.localeCompare(b.name));
    const entries=all.filter(entry=>entry.name.toLowerCase().includes(q)&&(!country||(country==='untagged'?!playlistCountry(entry.name):playlistCountry(entry.name)===country)));

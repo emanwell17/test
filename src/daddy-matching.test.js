@@ -80,3 +80,11 @@ test('West Ham broadcast aliases and event metadata resolve without matching ano
   assert.equal(matchesIptvEvent('West Ham vs West Brom @ Oct 31 3:50 PM :Viaplay DK 28',fixture),true);
   assert.equal(matchesIptvEvent('West Ham vs Liverpool @ Oct 31 3:50 PM :Viaplay DK 28',fixture),false);
 });
+
+
+test('Olympiacos and AC Milan match the playlist event aliases without selecting Inter',()=>{
+ const fixture={home:'Olympiacos',away:'AC Milan',sport:'football',start:Date.UTC(2026,10,26,17,45)};
+ assert.equal(matchesIptvEvent('Live | Olympiakos vs. AC Milan | all | CA: SOCCER PPV 11',fixture),true);
+ assert.equal(matchesIptvEvent('Next | Olympiakos Piraeus vs Milan || Arabic | 26-11-2026 | 17:10 (GMT)',fixture),true);
+ assert.equal(matchesIptvEvent('Live | Olympiakos vs Inter Milan | all',fixture),false);
+});
