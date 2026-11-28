@@ -20,3 +20,13 @@ test('playback waits for selection, coalesces concurrent viewers and renews near
  await resolve(ref);assert.equal(resolutions,1);
  time+=550000;await resolve(ref);assert.equal(resolutions,2);assert.equal(sessions,2);
 });
+
+test('provider labels survive parsing and sibling providers are restricted to the configured account',()=>{
+ const playlist='https://live.flixnest.app/u/fixture.strong/live/playlist.m3u8';
+ const text=['strong','dino','trex','dream','cloud'].map((p,i)=>`#EXTINF:-1,${['Strong8K','DINO','Trex','Dream 4K','Neo 4K Pro'][i]} · UK: SPORT HD
+https://live.flixnest.app/u/fixture.${p}/live/stream/${i}.m3u8`).join('\n');
+ const entries=parsePlaylist(text,playlist);
+ assert.deepEqual(entries.map(e=>e.provider),['Strong8K','DINO','Trex','Dream 4K','Neo 4K Pro']);
+ assert(entries.every(e=>e.name==='UK: SPORT HD'));
+ assert.equal(parsePlaylist(text.replaceAll('fixture.','stranger.'),playlist).length,0);
+});

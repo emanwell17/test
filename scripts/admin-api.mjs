@@ -44,11 +44,13 @@ export async function adminApi(request,{playlist,listChannels,catalog=catalogApi
   if(request.method==='GET'&&url.pathname.endsWith('/playlist')){
    const q=(url.searchParams.get('q')||'').toLowerCase();const offset=Math.max(0,Number(url.searchParams.get('offset'))||0);
    const country=url.searchParams.get('country')||'';
+   const provider=url.searchParams.get('provider')||'';
    const all=await playlist({refresh:url.searchParams.get('refresh')==='1'});
    const display=new Intl.DisplayNames(['en'],{type:'region'});
    const countries=[...new Set(all.map(entry=>playlistCountry(entry.name)).filter(Boolean))].map(code=>({code,name:display.of(code==='UK'?'GB':code)})).sort((a,b)=>a.name.localeCompare(b.name));
-   const entries=all.filter(entry=>entry.name.toLowerCase().includes(q)&&(!country||(country==='untagged'?!playlistCountry(entry.name):playlistCountry(entry.name)===country)));
-   return Response.json({total:entries.length,countries,channels:entries.slice(offset,offset+100).map(({id,name})=>({id,name}))});
+   const providers=[...new Set(all.map(entry=>entry.provider||'Other'))].sort();
+   const entries=all.filter(entry=>(!provider||(entry.provider||'Other')===provider)&&entry.name.toLowerCase().includes(q)&&(!country||(country==='untagged'?!playlistCountry(entry.name):playlistCountry(entry.name)===country)));
+   return Response.json({total:entries.length,countries,providers,channels:entries.slice(offset,offset+100).map(({id,name,provider})=>({id,name,provider:provider||'Other'}))});
   }
   if(request.method==='GET'&&url.pathname.endsWith('/fixtures')){
    const sport=url.searchParams.get('sport'),date=url.searchParams.get('date');

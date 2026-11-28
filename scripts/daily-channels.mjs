@@ -17,7 +17,7 @@ const root=pathToFileURL(join(dataRoot,'daily-channels')+sep);
 const sports={football:'soccer',basketball:'basketball','american-football':'american-football',hockey:'hockey',baseball:'baseball','motor-sports':'motorsport',fight:'boxing',tennis:'tennis',rugby:'rugby-union',golf:'golf',billiards:'billiards',afl:'afl',darts:'darts',cricket:'cricket',other:'other'};
 const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Lagos',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 let loaded, database, preparing, timer, resources, resourcePending;
-const cacheVersion = 17;
+const cacheVersion = 18;
 let dailyPlaylist, playlistPending;
 let playlistDiskPending, playlistRetryAt=0;
 async function get(url,type='json') { const r=await fetch(url,{signal:AbortSignal.timeout(25000)});if(!r.ok){const error=Error(`Upstream HTTP ${r.status}`);error.status=r.status;throw error;}return type==='text'?r.text():r.json(); }
@@ -45,7 +45,7 @@ async function loadPlaylist({refresh=false}={}){
   try{
    const stored=JSON.parse(await readFile(new URL('playlist-index.json',root),'utf8'));
    if(stored.version===cacheVersion&&stored.fingerprint===fingerprint&&Array.isArray(stored.entries)&&Date.now()-stored.savedAt<7*86400000){
-    const text=stored.entries.map(entry=>`#EXTINF:-1,${entry.name}\n${entry.url}`).join('\n');
+    const text=stored.entries.map(entry=>`#EXTINF:-1,${entry.provider?entry.provider+' · ':''}${entry.name}\n${entry.url}`).join('\n');
     const entries=parsePlaylist(text,url);
     if(entries.length)dailyPlaylist={day:stored.day,index:playlistIndex(entries)};
    }
