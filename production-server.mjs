@@ -1,4 +1,4 @@
-import {SITE_ORIGIN,siteRequestAllowed} from './scripts/site-access.mjs';
+import {SITE_ORIGINS,siteRequestAllowed} from './scripts/site-access.mjs';
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
@@ -25,7 +25,7 @@ if(process.env.ADMIN_ORIGIN){
  if(configured.protocol!=='https:'||configured.username||configured.password||configured.pathname!=='/'||configured.search||configured.hash)throw Error('ADMIN_ORIGIN must be an HTTPS origin');
  adminOrigin=configured.origin;
 }
-const origins=new Set([SITE_ORIGIN,...(adminOrigin?[adminOrigin]:[])]);
+const origins=new Set([...SITE_ORIGINS,...(adminOrigin?[adminOrigin]:[])]);
 const relay=createRelay({secret:process.env.RELAY_SECRET,apiKey:process.env.SESSION_API_KEY,allowedOrigins:[...origins],ttlSeconds:600,cacheBytes:Math.max(8,Math.min(256,Number(process.env.CACHE_MAX_MB)||64))*1024*1024});
 const internal=http.createServer((req,res)=>{relay(req,res).catch(()=>{if(!res.headersSent)res.writeHead(502);res.end('Relay unavailable');});});
 await new Promise((resolve,reject)=>{internal.once('error',reject);internal.listen(relayPort,'127.0.0.1',resolve);});

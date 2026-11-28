@@ -26,3 +26,14 @@ test('public callers cannot create operator sessions; hosting health probes stil
  assert.equal(siteRequestAllowed('GET','/healthz',{}),true);
  assert.equal(siteRequestAllowed('POST','/healthz',{}),false);
 });
+
+
+test('official CV domains can use APIs and native media, without granting admin or session creation',()=>{
+ for(const origin of ['https://scorezone.cv','https://scorezonetv.cv']){
+  assert(siteRequestAllowed('POST','/api/matches/playback',{origin}));
+  assert(siteRequestAllowed('GET','/hls/ticket/index.m3u8',{referer:origin+'/match.html'}));
+  assert.equal(siteRequestAllowed('POST','/api/admin/site/change',{origin},'https://adminpage.pxxl.pro'),false);
+  assert.equal(siteRequestAllowed('POST','/api/sessions',{origin}),false);
+  assert.equal(siteRequestAllowed('POST','/api/matches/playback',{origin:origin+'.evil.test'}),false);
+ }
+});
