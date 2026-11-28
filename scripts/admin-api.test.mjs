@@ -25,7 +25,7 @@ test('admin controls persist, protect playlist access, and enforce removal and l
  await writeFile(join(directory,'daily-channels','current.json'),JSON.stringify({version:16,day,matches:{[fixtureKey(fixture)]:{fixture,channels:[channel],preparedDay:day}},completedSports:[]}));
  const dependencies={playlist:adminPlaylist,listChannels:listDailyChannels,catalog:async()=>({data:{Stages:[]}}),leagueDirectory:async()=>[{name:'Test League',country:'England',stage:{Cnm:'England',CompN:'Test League'}}]};
  const request=(path,body,token='test-admin-only',deps=dependencies)=>adminApi(new Request('https://backend.test/api/'+path,{headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},method:body?'POST':'GET',...(body?{body:JSON.stringify(body)}:{})}),deps);
- const save=async body=>{const result=await request('admin/site/change',body);assert.equal(result.status,200,JSON.stringify(await result.clone().json()));};
+ const save=async body=>{const result=await request('admin/site/change',body);assert.equal(result.status,200,JSON.stringify(await result.clone().json()));const saved=await result.json();assert.equal(saved.settings.revision,saved.revision);assert(saved.settings.defaultLeagues);if(body.action==='stream'&&body.enabled){assert.equal(saved.channel.id,body.channelId);assert.equal(saved.channel.url,undefined);if(typeof body.locked==='boolean')assert.equal(saved.channel.locked,body.locked);}};
  try{
   assert.equal((await request('admin/site/playlist',null,'wrong')).status,401);
   const login=await(await request('admin/site/login',{remember:true})).json();

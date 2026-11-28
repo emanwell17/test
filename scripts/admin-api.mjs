@@ -1,3 +1,4 @@
+import {streamTier} from '../shared/stream-tier.js';
 import {randomUUID} from 'node:crypto';
 import {adminAuthentication,issueAdminSession,revokeAdminSession} from './admin-sessions.mjs';
 import {adminSettings,updateAdminSettings,publicSettings} from './admin-store.mjs';
@@ -77,7 +78,12 @@ export async function adminApi(request,{playlist,listChannels,catalog=catalogApi
   const body=JSON.parse(text);
   if(url.pathname.endsWith('/channels'))return Response.json(await listChannels(fixtureFrom(body)));
   if(!url.pathname.endsWith('/change'))throw Error('Unknown action');
-  let fixture;
+  let fixture,sourceChannel;
+  // Validate against the cached playlist before taking the settings write lock.
+  if(body.action==='stream'&&body.enabled){
+   sourceChannel=(await playlist()).find(entry=>entry.id===body.channelId);
+   if(!sourceChannel)throw Error('Channel is absent from the current playlist');
+  }
   const settings=await updateAdminSettings(async state=>{
    if(body.action==='order'){
     if(!Array.isArray(body.order)||body.order.length>2000)throw Error('Invalid order');
@@ -104,7 +110,6 @@ export async function adminApi(request,{playlist,listChannels,catalog=catalogApi
    }else if(body.action==='stream'){
     fixture=fixtureFrom(body);const id=clean(body.channelId);
     if(!/^[a-f0-9]{24}$/.test(id)||typeof body.enabled!=='boolean'||(body.locked!=null&&typeof body.locked!=='boolean'))throw Error('Invalid channel');
-    if(body.enabled&&!(await playlist()).some(entry=>entry.id===id))throw Error('Channel is absent from the current playlist');
     const key=fixtureIdentity(fixture);state.streams[key]||={};state.streams[key][id]={id,enabled:body.enabled,...(typeof body.locked==='boolean'?{locked:body.locked}:{})};
    }else throw Error('Unknown action');
   });
@@ -115,6 +120,12 @@ export async function adminApi(request,{playlist,listChannels,catalog=catalogApi
    const events=normalizeLiveScore(data,body.sport,settings).filter(event=>event._league.toLowerCase()===body.name.trim().toLowerCase());
    for(let offset=0;offset<events.length;offset+=4)await Promise.all(events.slice(offset,offset+4).map(event=>listChannels({home:event.home_team_name,away:event.away_team_name,sport:body.sport,start:event.timestamp,competition:event._league}).catch(()=>{})));
   })().catch(()=>{});
-  return Response.json({ok:true,revision:settings.revision});
+  let channel;
+  if(sourceChannel){
+   const rule=settings.streams[fixtureIdentity(fixture)][sourceChannel.id];
+   const {url,...safeChannel}=streamTier({...sourceChannel,...(typeof rule.locked==='boolean'?{adminLocked:rule.locked}:{})});
+   channel=safeChannel;
+  }
+  return Response.json({ok:true,revision:settings.revision,settings:{...settings,defaultLeagues:LEAGUES},...(channel?{channel}:{})});
  }catch(error){return Response.json({error:error.message||'Admin action failed'},{status:400});}
 }
