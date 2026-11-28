@@ -12,12 +12,12 @@ import {ensureLocalRelay,ensureLocalRestream} from './local-relay-process.mjs';
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {parseDaddySchedule,channelIdentity} from '../src/daddy-matching.js';
 import {normalizeLiveScore,includeCatalogEvent} from '../src/livescore-catalog.js';
-import {fixtureKey,parsePlaylist,playlistIndex,prepareFixture,createPlaybackResolver,prioritizeChannels} from './daily-channel-core.mjs';
+import {fixtureKey,parsePlaylist,providerPlaylistUrls,playlistIndex,prepareFixture,createPlaybackResolver,prioritizeChannels} from './daily-channel-core.mjs';
 const root=pathToFileURL(join(dataRoot,'daily-channels')+sep);
 const sports={football:'soccer',basketball:'basketball','american-football':'american-football',hockey:'hockey',baseball:'baseball','motor-sports':'motorsport',fight:'boxing',tennis:'tennis',rugby:'rugby-union',golf:'golf',billiards:'billiards',afl:'afl',darts:'darts',cricket:'cricket',other:'other'};
 const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Lagos',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 let loaded, database, preparing, timer, resources, resourcePending;
-const cacheVersion = 18;
+const cacheVersion = 19;
 let dailyPlaylist, playlistPending;
 let playlistDiskPending, playlistRetryAt=0;
 async function get(url,type='json') { const r=await fetch(url,{signal:AbortSignal.timeout(25000)});if(!r.ok){const error=Error(`Upstream HTTP ${r.status}`);error.status=r.status;throw error;}return type==='text'?r.text():r.json(); }
@@ -58,13 +58,17 @@ async function loadPlaylist({refresh=false}={}){
   throw Error('Playlist refresh unavailable');
  }
  if(!playlistPending)playlistPending=(async()=>{
-  const entries=parsePlaylist(await get(url,'text'),url);
+  const sources=providerPlaylistUrls(url);
+  const results=await Promise.allSettled(sources.map(async source=>parsePlaylist(await get(source,'text'),source)));
+  const entries=[...new Map(results.flatMap((result,i)=>result.status==='fulfilled'?result.value:[...(dailyPlaylist?.index.values()||[])].flat().filter(entry=>entry.url.startsWith(sources[i].replace(/playlist\.m3u8$/,'stream/')))).map(entry=>[entry.id,entry])).values()];
+  playlistRetryAt=results.some(result=>result.status==='rejected')?Date.now()+30000:0;
+  if(results.some(result=>result.status==='rejected'))console.warn('Some IPTV provider playlists could not refresh; retained cached channels where available');
   if(!entries.length)throw Error('IPTV playlist empty');
-  dailyPlaylist={day:today,index:playlistIndex(entries)};
+  dailyPlaylist={day:results.every(result=>result.status==='fulfilled')?today:'',index:playlistIndex(entries)};
   try{
    await mkdir(root,{recursive:true});
    const temporary=new URL(`playlist-index-${process.pid}.tmp`,root);
-   await writeFile(temporary,JSON.stringify({version:cacheVersion,day:today,fingerprint,savedAt:Date.now(),entries}));
+   await writeFile(temporary,JSON.stringify({version:cacheVersion,day:dailyPlaylist.day,fingerprint,savedAt:Date.now(),entries}));
    await rename(temporary,new URL('playlist-index.json',root));
   }catch{}
   return dailyPlaylist.index;

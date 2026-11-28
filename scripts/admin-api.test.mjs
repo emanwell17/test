@@ -21,7 +21,7 @@ test('admin controls persist, protect playlist access, and enforce removal and l
  const manual={id:channelKey(source.replace('123','456')),name:'FR: MANUAL SPORT HD',url:source.replace('123','456')};
  const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Lagos',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  await mkdir(join(directory,'daily-channels'));
- await writeFile(join(directory,'daily-channels','playlist-index.json'),JSON.stringify({version:18,fingerprint:createHash('sha256').update(process.env.IPTV_PLAYLIST_URL).digest('hex'),entries:[channel,manual],savedAt:Date.now(),day}));
+ await writeFile(join(directory,'daily-channels','playlist-index.json'),JSON.stringify({version:19,fingerprint:createHash('sha256').update(process.env.IPTV_PLAYLIST_URL).digest('hex'),entries:[channel,manual],savedAt:Date.now(),day}));
  await writeFile(join(directory,'daily-channels','current.json'),JSON.stringify({version:16,day,matches:{[fixtureKey(fixture)]:{fixture,channels:[channel],preparedDay:day}},completedSports:[]}));
  const dependencies={playlist:adminPlaylist,listChannels:listDailyChannels,catalog:async()=>({data:{Stages:[]}}),leagueDirectory:async()=>[{name:'Test League',country:'England',stage:{Cnm:'England',CompN:'Test League'}}]};
  const request=(path,body,token='test-admin-only',deps=dependencies)=>adminApi(new Request('https://backend.test/api/'+path,{headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},method:body?'POST':'GET',...(body?{body:JSON.stringify(body)}:{})}),deps);

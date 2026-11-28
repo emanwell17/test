@@ -21,13 +21,13 @@ export function parsePlaylist(text, playlistUrl) {
     if (line.startsWith('#EXTINF:')) {
       const label=line.slice(line.indexOf(',')+1).trim();
       const group=line.match(/group-title="([^"]*)"/)?.[1]||'';
-      provider=(label.match(/^(Strong8K|DINO|Trex|Dream\s*4K|Neo\s*4K\s*Pro)\s*[·:-]/i)||group.match(/^(Strong8K|DINO|Trex|Dream\s*4K|Neo\s*4K\s*Pro)\s*[:·-]/i))?.[1]||'';
-      name=label.replace(/^(?:Strong8K|DINO|Trex|Dream\s*4K|Neo\s*4K\s*Pro)\s*[·:-]\s*/i,'').trim();
+      provider=(label.match(/^(Strong8K|DINO(?:\s+IPTV)?|Trex|Dream\s*4K|Neo\s*4K\s*Pro)\s*[·:-]/i)||group.match(/^(Strong8K|DINO(?:\s+IPTV)?|Trex|Dream\s*4K|Neo\s*4K\s*Pro)\s*[:·-]/i))?.[1]||'';
+      name=label.replace(/^(?:Strong8K|DINO(?:\s+IPTV)?|Trex|Dream\s*4K|Neo\s*4K\s*Pro)\s*[·:-]\s*/i,'').trim();
     }
     else if (/^https?:/.test(line) && name) {
       try {
         const u = new URL(line.trim());
-        if (u.origin === 'https://live.flixnest.app' && /^\/u\/[A-Za-z0-9_.-]+\/live\/stream\/[^/]+\.m3u8$/.test(u.pathname) && (!prefix || u.pathname.startsWith(prefix) || u.pathname.split('/')[2].split('.')[0]===owner) && !u.username && !u.password && !/dstv/i.test(name) && !excludedCodec({name})) entries.push({ id:channelKey(u.href), name, provider:provider||({strong:'Strong8K',dino:'DINO',trex:'Trex',dream:'Dream 4K',dream4k:'Dream 4K',cloud:'Neo 4K Pro'}[u.pathname.split('/')[2].split('.')[1]]||'Other'), url:u.href });
+        if (u.origin === 'https://live.flixnest.app' && /^\/u\/[A-Za-z0-9_.-]+\/live\/stream\/[^/]+\.m3u8$/.test(u.pathname) && (!prefix || u.pathname.startsWith(prefix) || u.pathname.split('/')[2].split('.')[0]===owner) && !u.username && !u.password && !/dstv/i.test(name) && !excludedCodec({name})) entries.push({ id:channelKey(u.href), name, provider:(/^DINO/i.test(provider)?'DINO':provider)||({strong:'Strong8K',dino:'DINO',trex:'Trex',dream:'Dream 4K',dream4k:'Dream 4K',cloud:'Neo 4K Pro'}[u.pathname.split('/')[2].split('.')[1]]||'Other'), url:u.href });
       } catch {}
       name='';
     }
@@ -120,3 +120,9 @@ export function createPlaybackResolver({ resolveSource, createSession, now=Date.
   };
 }
 
+
+export function providerPlaylistUrls(value){
+ const url=new URL(value);
+ if(!/\.strong\/live\/playlist\.m3u8$/.test(url.pathname))return [url.href];
+ return ['strong','trex','dream','dino','cloud'].map(provider=>{const next=new URL(url);next.pathname=next.pathname.replace(/\.strong\/live\//,'.'+provider+'/live/');return next.href;});
+}

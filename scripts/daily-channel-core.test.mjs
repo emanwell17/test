@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parsePlaylist,playlistIndex,prepareFixture,createPlaybackResolver} from './daily-channel-core.mjs';
+import {parsePlaylist,providerPlaylistUrls,playlistIndex,prepareFixture,createPlaybackResolver} from './daily-channel-core.mjs';
 test('daily preparation stores stable channel addresses and keeps country and number distinct',()=>{
  const url='https://live.flixnest.app/u/fixture.strong/live/stream/strongvaulttv%3Achannel%3A1.m3u8';
  const refs=parsePlaylist(`#EXTM3U\n#EXTINF:-1,Strong8K · PL: CANAL+ SPORT 3 ᴿᴬᵂ\n${url}\n#EXTINF:-1,Wrong\nhttps://example.com/a.m3u8`);
@@ -29,4 +29,9 @@ https://live.flixnest.app/u/fixture.${p}/live/stream/${i}.m3u8`).join('\n');
  assert.deepEqual(entries.map(e=>e.provider),['Strong8K','DINO','Trex','Dream 4K','Neo 4K Pro']);
  assert(entries.every(e=>e.name==='UK: SPORT HD'));
  assert.equal(parsePlaylist(text.replaceAll('fixture.','stranger.'),playlist).length,0);
+});
+
+test('Strong-only configuration expands to the five verified feeds for the same account',()=>{
+ const urls=providerPlaylistUrls('https://live.flixnest.app/u/fixture.strong/live/playlist.m3u8');
+ assert.equal(urls.length,5);assert.deepEqual(urls.map(u=>new URL(u).pathname.split('/')[2]),['fixture.strong','fixture.trex','fixture.dream','fixture.dino','fixture.cloud']);
 });
