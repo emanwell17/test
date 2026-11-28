@@ -189,7 +189,6 @@ async function configuredChannels(fixture,channels){
  return orderChannels(result,settings.streamOrder?.[fixtureIdentity(fixture)]||[]);
 }
 export async function listDailyChannels(fixture){
- if(blockedBasketballPlayback(fixture))return {channels:[],match:null,complete:true};
  const settings=await adminSettings();
  if(fixtureDisabled(fixture,settings))return {channels:[],match:null,complete:true};
  const result=await automaticDailyChannels(fixture);
@@ -200,7 +199,6 @@ export async function listDailyChannels(fixture){
  return {...result,channels:channels.map(({url,...channel})=>channel),...(channels.length?{complete:true,waitingForEvent:false}:{})};
 }
 async function automaticDailyChannels(fixture){
- if(blockedBasketballPlayback(fixture))return {channels:[],match:null,complete:true};
  await load();const key=fixtureKey(fixture);const saved=database.matches[key];
  const savedChannels=saved?.channels.filter(c=>!excludedCodec(c));
  if(savedChannels?.length)return {key,channels:prioritizeChannels(savedChannels).map(streamTier).map(({url,...c})=>c),match:saved.match,complete:true};
@@ -269,14 +267,8 @@ function prepareRemaining(matchKey,selectedId){
   }
  })().finally(()=>backgrounds.delete(matchKey));backgrounds.set(matchKey,job);
 }
-// Some saved fixtures have no competition metadata, so block basketball
-// playback server-side until NBA fixtures can be reliably distinguished.
-function blockedBasketballPlayback(fixture){
- return fixture?.sport==='basketball'||/\bnba\b/i.test([fixture?.home,fixture?.away,fixture?.competition].join(' '));
-}
 export async function playDailyChannel(matchKey,channelId,access=null){
  await load();const record=database.matches[matchKey];
- if(blockedBasketballPlayback(record?.fixture)){const error=Error('Playback unavailable');error.status=403;throw error;}
  const reference=record&&(await configuredChannels(record.fixture,record.channels||[])).find(c=>c.id===channelId);
  if(!reference || excludedCodec(reference))throw Error('Unknown channel');
  if(streamTier(reference).locked && (!access?.premium || access.expiresAt<=Date.now())){const error=Error('Premium required');error.status=403;throw error;}
